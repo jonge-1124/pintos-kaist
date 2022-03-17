@@ -63,6 +63,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -180,6 +181,7 @@ tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
+	struct thread *current = thread_current(); 
 	tid_t tid;
 
 	ASSERT (function != NULL);
@@ -190,7 +192,7 @@ thread_create (const char *name, int priority,
 		return TID_ERROR;
 
 	/* Initialize thread. */
-	init_thread (t, name, priority);
+	init_thread (t, name, PRI_DEFAULT);
 	tid = t->tid = allocate_tid ();
 
 	/* Call the kernel_thread if it scheduled.
@@ -206,6 +208,8 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+
+	if (PRI_DEFAULT > current->priority) thread_yield();
 
 	return tid;
 }
@@ -240,7 +244,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered (&ready_list, &t->elem, compare_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -303,7 +307,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, compare_priority, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -345,6 +349,17 @@ int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	return 0;
+}
+
+bool compare_priority(const struct list_elem *a,
+					  const struct list_elem *b, void *aux){
+	
+	struct thread *threadA = list_entry(a, struct thread, elem);
+	struct thread *threadB = list_entry(b, struct thread, elem);
+
+	if (threadA->priority >= threadB->priority) return true;
+	else return false;
+
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -420,8 +435,10 @@ static struct thread *
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
-	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	else{
+		list_sort(&ready_list, compare_priority, NULL);
+		return list_entry (list_pop_back (&ready_list), struct thread, elem);
+	}	
 }
 
 /* Use iretq to launch the thread */
@@ -531,7 +548,7 @@ do_schedule(int status) {
 	ASSERT (thread_current()->status == THREAD_RUNNING);
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
-			list_entry (list_pop_front (&destruction_req), struct thread, elem);
+			list_entry (list_pop_back (&destruction_req), struct thread, elem);
 		palloc_free_page(victim);
 	}
 	thread_current ()->status = status;
