@@ -175,6 +175,7 @@ tid_t thread_create(const char *name, int priority,
 					thread_func *function, void *aux)
 {
 	struct thread *t;
+	struct thread *current = thread_current();
 	tid_t tid;
 
 	ASSERT(function != NULL);
@@ -201,6 +202,7 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
+	if (current->priority < priority) thread_yield();
 
 	return tid;
 }
@@ -233,7 +235,7 @@ void thread_unblock(struct thread *t)
 
 	old_level = intr_disable();
 	ASSERT(t->status == THREAD_BLOCKED);
-	list_push_back(&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem,thread_cmp_pri, NULL);
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -298,7 +300,7 @@ void thread_yield(void)
 
 	old_level = intr_disable();
 	if (curr != idle_thread)
-		list_push_back(&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem,thread_cmp_pri, NULL);
 	do_schedule(THREAD_READY);
 	intr_set_level(old_level);
 }
@@ -354,6 +356,10 @@ void thread_wakeup(int64_t ticks)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+	if (!list_empty(&ready_list)){
+		struct thread *first_ready_thread = list_entry(list_front(&ready_list), struct thread, elem);
+		if (first_ready_thread->priority > new_priority) thread_yield();
+	}
 }
 
 /* Returns the current thread's priority. */
@@ -361,6 +367,15 @@ int thread_get_priority(void)
 {
 	return thread_current()->priority;
 }
+
+bool thread_cmp_pri(struct list_elem *a, struct list_elem *b, void *aux)
+{
+	struct thread *threadA = list_entry(a, struct thread, elem);
+	struct thread *threadB = list_entry(b, struct thread, elem);
+	if (threadA->priority > threadB->priority) return true;
+	else return false;
+}
+
 
 /* Sets the current thread's nice value to NICE. */
 void thread_set_nice(int nice UNUSED)
