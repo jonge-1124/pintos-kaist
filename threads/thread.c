@@ -368,7 +368,7 @@ int thread_get_priority(void)
 	return thread_current()->priority;
 }
 
-bool thread_cmp_pri(struct list_elem *a, struct list_elem *b, void *aux)
+bool thread_cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *threadA = list_entry(a, struct thread, elem);
 	struct thread *threadB = list_entry(b, struct thread, elem);
