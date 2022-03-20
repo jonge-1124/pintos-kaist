@@ -357,6 +357,25 @@ void thread_wakeup(int64_t ticks)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+
+	/* check whether revised priority is lower than donations' priorith */
+	if (!list_empty(&thread_current()->donation_list))
+	{
+		int max_pri = 0;
+		struct list_elem *curr = list_begin(&thread_current()->donation_list);
+		struct list_elem *last = list_end(&thread_current()->donation_list);
+
+		while(curr != last)
+		{
+			struct donation *d = list_entry(curr, struct donation, elem);
+			if (d->priority > max_pri) max_pri = d->priority;
+			curr = list_next(curr);
+		}
+
+		if (thread_current()->priority < max_pri) thread_current()->priority = max_pri;
+
+	}
+	
 	if (!list_empty(&ready_list)){
 		struct thread *first_ready_thread = list_entry(list_front(&ready_list), struct thread, elem);
 		if (first_ready_thread->priority > new_priority) thread_yield();
@@ -470,6 +489,10 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	t->origi_priority = priority;
+	list_init(&t->donation_list);
+	t->waiting_lock = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

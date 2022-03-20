@@ -189,7 +189,30 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
+	struct thread *cur = thread_current();
+	struct thread *owner;
+	struct donation *d;
+	int nested_depth = 0;
+
+	d->requested_lock = lock;
+	d->priority = cur->priority;
+	cur->waiting_lock = lock;
+
+	if (lock->holder != NULL)
+	{
+		owner = lock->holder;
+		list_push_back(&owner->donation_list, &d->elem);
+		owner->priority = cur->priority;
+	}
+
+	while(owner->waiting_lock != NULL && nested_depth < 8)
+	{
+		owner = owner->waiting_lock->holder;
+		owner->priority = cur->priority;
+	}
+
 	sema_down(&lock->semaphore);
+	cur->waiting_lock = NULL;
 	lock->holder = thread_current();
 }
 
@@ -220,6 +243,42 @@ void lock_release(struct lock *lock)
 {
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
+
+	/* remove requested lock from donation_list */
+	struct list_elem *curr = list_begin(&thread_current()->donation_list);
+	struct list_elem *last = list_end(&thread_current()->donation_list);
+
+	while(curr != last)
+	{
+		struct donation *d = list_entry(curr, struct donation, elem);
+		if (d->requested_lock == lock)
+		{
+			curr = list_next(curr);
+			list_remove(&d->elem);
+
+		}
+		else curr = list_next(curr);
+	}
+
+	/* get back to original priority and fetch max donation priority */
+	thread_current()->priority = thread_current()->origi_priority;
+
+	if (!list_empty(&thread_current()->donation_list))
+	{
+		int max_pri = 0;
+		struct list_elem *curr = list_begin(&thread_current()->donation_list);
+		struct list_elem *last = list_end(&thread_current()->donation_list);
+
+		while(curr != last)
+		{
+			struct donation *d = list_entry(curr, struct donation, elem);
+			if (d->priority > max_pri) max_pri = d->priority;
+			curr = list_next(curr);
+		}
+
+		if (thread_current()->priority < max_pri) thread_current()->priority = max_pri;
+
+	}
 
 	lock->holder = NULL;
 	sema_up(&lock->semaphore);

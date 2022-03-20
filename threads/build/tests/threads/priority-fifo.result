@@ -1,2 +1,2 @@
 FAIL
-No iterations found in output.
+Run didn't start up properly: no "Pintos booting" message
