@@ -90,7 +90,7 @@ typedef int tid_t;
 struct donation
 {
 	struct lock *requested_lock;
-	int priority;
+	struct thread *from;
 	struct list_elem elem;
 };
 

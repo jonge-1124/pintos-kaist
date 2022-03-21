@@ -200,7 +200,7 @@ void lock_acquire(struct lock *lock)
 		int nested_depth = 0;
 
 		d.requested_lock = lock;
-		d.priority = cur->priority;
+		d.from = cur;
 
 		list_push_back(&owner->donation_list, &d.elem);
 		owner->priority = cur->priority;
@@ -277,7 +277,7 @@ void lock_release(struct lock *lock)
 		while(curr != last)
 		{
 			struct donation *d = list_entry(curr, struct donation, elem);
-			if (d->priority > max_pri) max_pri = d->priority;
+			if (d->from->priority > max_pri) max_pri = d->from->priority;
 			curr = list_next(curr);
 		}
 

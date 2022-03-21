@@ -369,7 +369,7 @@ void thread_set_priority(int new_priority)
 		while(curr != last)
 		{
 			struct donation *d = list_entry(curr, struct donation, elem);
-			if (d->priority > max_pri) max_pri = d->priority;
+			if (d->from->priority > max_pri) max_pri = d->from->priority;
 			curr = list_next(curr);
 		}
 
