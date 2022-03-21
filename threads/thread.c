@@ -357,6 +357,7 @@ void thread_wakeup(int64_t ticks)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+	thread_current()->origi_priority = new_priority;
 
 	/* check whether revised priority is lower than donations' priorith */
 	if (!list_empty(&thread_current()->donation_list))
@@ -491,8 +492,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->magic = THREAD_MAGIC;
 
 	t->origi_priority = priority;
-	list_init(&t->donation_list);
 	t->waiting_lock = NULL;
+	list_init(&t->donation_list);
+	
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

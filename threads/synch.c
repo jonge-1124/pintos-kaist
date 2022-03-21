@@ -190,30 +190,33 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!lock_held_by_current_thread(lock));
 
 	struct thread *cur = thread_current();
-	struct thread *owner;
-	struct donation *d;
-	int nested_depth = 0;
-
-	d->requested_lock = lock;
-	d->priority = cur->priority;
-	cur->waiting_lock = lock;
+	
 
 	if (lock->holder != NULL)
 	{
-		owner = lock->holder;
-		list_push_back(&owner->donation_list, &d->elem);
-		owner->priority = cur->priority;
-	}
+		cur->waiting_lock = lock;
+		struct thread *owner = lock->holder;
+		struct donation d;
+		int nested_depth = 0;
 
-	while(owner->waiting_lock != NULL && nested_depth < 8)
-	{
-		owner = owner->waiting_lock->holder;
+		d.requested_lock = lock;
+		d.priority = cur->priority;
+
+		list_push_back(&owner->donation_list, &d.elem);
 		owner->priority = cur->priority;
+		nested_depth++;
+
+		while(owner->waiting_lock != NULL && nested_depth < 8)
+		{
+			owner = owner->waiting_lock->holder;
+			owner->priority = cur->priority;
+			nested_depth++;
+		}
 	}
 
 	sema_down(&lock->semaphore);
 	cur->waiting_lock = NULL;
-	lock->holder = thread_current();
+	lock->holder = cur;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -244,9 +247,11 @@ void lock_release(struct lock *lock)
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
+	struct thread *cur_thread = thread_current();
+
 	/* remove requested lock from donation_list */
-	struct list_elem *curr = list_begin(&thread_current()->donation_list);
-	struct list_elem *last = list_end(&thread_current()->donation_list);
+	struct list_elem *curr = list_begin(&cur_thread->donation_list);
+	struct list_elem *last = list_end(&cur_thread->donation_list);
 
 	while(curr != last)
 	{
@@ -261,13 +266,13 @@ void lock_release(struct lock *lock)
 	}
 
 	/* get back to original priority and fetch max donation priority */
-	thread_current()->priority = thread_current()->origi_priority;
+	cur_thread->priority = cur_thread->origi_priority;
 
-	if (!list_empty(&thread_current()->donation_list))
+	if (!list_empty(&cur_thread->donation_list))
 	{
 		int max_pri = 0;
-		struct list_elem *curr = list_begin(&thread_current()->donation_list);
-		struct list_elem *last = list_end(&thread_current()->donation_list);
+		struct list_elem *curr = list_begin(&cur_thread->donation_list);
+		struct list_elem *last = list_end(&cur_thread->donation_list);
 
 		while(curr != last)
 		{
@@ -276,7 +281,7 @@ void lock_release(struct lock *lock)
 			curr = list_next(curr);
 		}
 
-		if (thread_current()->priority < max_pri) thread_current()->priority = max_pri;
+		if (cur_thread->priority < max_pri) cur_thread->priority = max_pri;
 
 	}
 
