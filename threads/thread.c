@@ -412,6 +412,16 @@ void mlfqs_recalc_ready_recent_cpu(void)
          mlfqs_recent_cpu(thread_to_update);
       }
    }
+	if (!list_empty(&sleeping_list))
+    {
+      struct list_elem *curr_elem = list_begin(&sleeping_list);
+      for (curr_elem; curr_elem != list_end(&sleeping_list); curr_elem = list_next(curr_elem))
+      {
+         struct thread *thread_to_update = list_entry(curr_elem, struct thread, elem);
+         mlfqs_recent_cpu(thread_to_update);
+      }
+    }
+
 }
 
 void mlfqs_recalc_ready_priority(void)
@@ -425,6 +435,15 @@ void mlfqs_recalc_ready_priority(void)
          mlfqs_priority(thread_to_update);
       }
    }
+   if (!list_empty(&sleeping_list))
+	{
+      struct list_elem *curr_elem = list_begin(&sleeping_list);
+      for (curr_elem; curr_elem != list_end(&sleeping_list); curr_elem = list_next(curr_elem))
+      {
+         struct thread *thread_to_update = list_entry(curr_elem, struct thread, elem);
+         mlfqs_priority(thread_to_update);
+      }
+    }
 }
 
 
