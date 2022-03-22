@@ -414,7 +414,7 @@ void mlfqs_recalc_ready_recent_cpu(void)
    }
 }
 
-void mlfqs_recalc_ready_pri(void)
+void mlfqs_recalc_ready_priority(void)
 {
    if (!list_empty(&ready_list))
    {

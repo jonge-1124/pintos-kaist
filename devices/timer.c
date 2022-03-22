@@ -144,7 +144,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
 			mlfqs_recalc_ready_recent_cpu();
          }
 		mlfqs_priority(thread_current());
-		mlfqs_recalc_ready_pri();
+		mlfqs_recalc_ready_priority();
       }
    }
    thread_wakeup(ticks);
