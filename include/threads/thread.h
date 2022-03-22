@@ -107,6 +107,10 @@ struct thread
 	int origi_priority;
 	struct lock *waiting_lock;
 	struct list donation_list;
+
+	int nice;
+	int recent_cpu;
+
 	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
@@ -163,5 +167,12 @@ int thread_get_load_avg(void);
 void do_iret(struct intr_frame *tf);
 
 struct list *get_ready_list(void);
+
+void mlfqs_priority(struct thread *t);
+void mlfqs_recent_cpu(struct thread *t);
+void mlfqs_load_avg(void);
+void mlfqs_increment(void);
+void mlfqs_recalc_ready_recent_cpu(void);
+void mlfqs_recalc_ready_pri(void);
 
 #endif /* threads/thread.h */
