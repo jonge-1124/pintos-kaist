@@ -56,7 +56,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			thread_exit();
 			
 			printf ("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
-			sema_down(curr->parent->wait_children);
+			lock_release(curr->wait_lock);
 			break;
 		
 		case SYS_FORK :
@@ -66,6 +66,18 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		
 		case SYS_EXEC :
+			char *cmd_line = f->R.rdi;
+			int result = process_exec(cmd_line);
+
+			if (result == -1)
+			{
+				struct thread *cur = thread_current();
+				cur->exit_status = -1;
+				thread_exit();
+				printf ("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
+				lock_relase(cur->wait_lock);
+
+			}
 			break;
 		
 		case SYS_WAIT :

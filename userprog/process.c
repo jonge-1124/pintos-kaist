@@ -76,8 +76,9 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
+	thread_current()->uf = *if_;
 	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+			PRI_DEFAULT, __do_fork, thread_current());
 }
 
 #ifndef VM
@@ -122,7 +123,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->tf;
+	struct intr_frame *parent_if = &parent->uf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -148,6 +149,18 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+
+	for (int i = 2; i < 128 ; i++)
+	{
+		if (parent->file_table[i].is_open && parent->file_table[i].file != NULL)
+		{
+			struct file *duplicated_file = file_duplicate(parent->file_table[i].file);
+			current->file_table[i].file = duplicated_file;
+			current->file_table[i].fd = i;
+			current->file_table[i].is_open = true;
+		}
+	}
+	current->next_fd = parent->next_fd;
 
 	process_init ();
 
@@ -273,9 +286,29 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	struct thread *cur = thread_current();
 
-	
-	return -1;
+	struct thread *child;
+
+	struct list_elem *cur_elem = list_begin(&cur->children);
+	struct list_elem *last_elem = list_end(&cur->children);
+
+	while ( cur_elem != last_elem)
+	{
+		struct thread *this_thread = list_entry(cur_elem, struct thread, elem);
+		if (this_thread->tid != child_tid)
+		{
+			child = this_thread;
+			break;
+		}
+		cur_elem = list_next(cur_elem);
+	}
+
+	if (cur_elem == last_elem) return -1;
+	if (child->wait_complete) return -1;
+
+	lock_acquire(child->wait_lock);
+	return child->exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */

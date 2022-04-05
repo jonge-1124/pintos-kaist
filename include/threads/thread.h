@@ -136,13 +136,22 @@ struct thread
 	unsigned magic;		  /* Detects stack overflow. */
 
 	//project2
-	int next_fd = 2;
+	
 	int exit_status; 
 	const char *thread_name;
 	
+	// exit and wait setting
 	struct thread *parent;
-	struct semaphore *wait_children;
-	struct fd_entity file_table[100];
+	struct list children;
+	struct lock *wait_lock;	
+	bool wait_complete;	//need to be initialized "false"
+	
+	// for file syscall
+	struct fd_entity file_table[128];
+	int next_fd;
+
+	// for fork
+	struct intr_frame uf;
 
 };
 
