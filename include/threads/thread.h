@@ -94,6 +94,13 @@ struct donation
 	struct list_elem elem;
 };
 
+struct fd_entity
+{
+	struct file *file;
+	int fd;
+	bool is_open;
+};
+
 struct thread
 {
 	/* Owned by thread.c. */
@@ -127,6 +134,16 @@ struct thread
 	/* Owned by thread.c. */
 	struct intr_frame tf; /* Information for switching */
 	unsigned magic;		  /* Detects stack overflow. */
+
+	//project2
+	int next_fd = 2;
+	int exit_status; 
+	const char *thread_name;
+	
+	struct thread *parent;
+	struct semaphore *wait_children;
+	struct fd_entity file_table[100];
+
 };
 
 /* If false (default), use round-robin scheduler.

@@ -122,7 +122,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -160,10 +160,24 @@ error:
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
-int
-process_exec (void *f_name) {
-	char *file_name = f_name;
+int 
+ process_exec(char *cmd_line) {
+	char *file_name;
 	bool success;
+
+
+	char *token, save_ptr;
+	char *argv[100];
+	int argc = 0;
+
+	for (token = strtok_r(cmd_line, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+	{
+		sprintf(argv[argc], token);
+		argc++;
+	}
+	argv[argc] = NULL;
+
+	file_name = argv[0];
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -173,11 +187,66 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
+	
+
 	/* We first kill the current context */
 	process_cleanup ();
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+
+	void **f_sp = &_if.rsp;
+	uintptr_t argv_stack_addr[argc];
+	int total_size_argv = 0;
+
+	// push argv contents to the stack
+	for (int i = argc-1 ; i >= 0 ; i--)
+	{
+		int size = strlen(argv[i]);
+		*f_sp--;
+		**(char **)f_sp = '\0';
+		for (int j = size ; j >=1 ; j--)
+		{
+			*f_sp--;
+			**(char**)f_sp = argv[i][j];
+		}
+		total_size_argv = total_size_argv + size;
+		argv_stack_addr[i] = *f_sp;
+
+	}
+
+	//word aligne for rsp
+	int extra_word_align = 0;
+	int eight_multiple = 0;
+
+	while(eight_multiple < total_size_argv) {
+		eight_multiple = eight_multiple + 8;
+	}
+
+	extra_word_align = eight_multiple - total_size_argv;
+	for (int i = 0; i < extra_word_align; i++)
+	{
+		*f_sp--;
+		**(char **)f_sp = 0;
+	}
+
+	// push argv address to the stack
+	for (int i = argc-1; i >= 0; i--)
+	{
+		*f_sp = *f_sp - 8;
+		**(uintptr_t **)f_sp = argv_stack_addr[argc];
+	}
+
+	// push return address to the stack
+	for (int i = 8; i >0 ; i--)
+	{
+		*f_sp--;
+		**(char **)f_sp = 0;
+	}
+
+	_if.R.rsi = argv_stack_addr[0];
+	_if.R.rdi = argc;
+
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -204,6 +273,8 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
+	
 	return -1;
 }
 
