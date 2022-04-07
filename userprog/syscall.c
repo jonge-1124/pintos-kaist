@@ -54,9 +54,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct thread *curr = thread_current();
 			curr->exit_status = status;
 			thread_exit();
-			
-			printf ("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
-			lock_release(curr->wait_lock);
+			lock_release(curr->exit_wait_lock);
 			break;
 		
 		case SYS_FORK :
@@ -75,7 +73,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				cur->exit_status = -1;
 				thread_exit();
 				printf ("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
-				lock_relase(cur->wait_lock);
+				lock_relase(cur->exit_wait_lock);
 
 			}
 			break;

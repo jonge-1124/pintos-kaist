@@ -120,7 +120,11 @@ void thread_init(void)
 	init_thread(initial_thread, "main", PRI_DEFAULT, NICE_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid();
+	
 	initial_thread->next_fd = 2;
+	initial_thread->wait_complete = false;
+	lock_init(initial_thread->exit_wait_lock);
+	lock_acquire(initial_thread->exit_wait_lock);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -625,6 +629,13 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	t->nice = nice;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
+	//exit & wait
+	lock_init(t->exit_wait_lock);
+	lock_acquire(t->exit_wait_lock);
+
+	//fd
+	t->next_fd = 2;
+	sema_init(t->sema_fork,0);
 	
 }
 
@@ -818,4 +829,39 @@ allocate_tid(void)
 struct list *get_ready_list(void)
 {
 	return &ready_list;
+}
+
+struct thread *get_child_by_id(tid_t id)
+{
+	
+	// check ready_list
+	struct list_elem *curr_elem = list_begin(&ready_list);
+	struct list_elem *last_elem = list_end(&ready_list);
+
+	while (curr_elem != last_elem)
+	{
+		struct thread *this_thread = list_entry(curr_elem, struct thread, elem);
+		if (this_thread->tid == id)
+		{
+			return this_thread;
+		}
+		curr_elem = list_next(curr_elem);
+	}
+
+	//check sleeping_list
+	curr_elem = list_begin(&sleeping_list);
+	last_elem = list_end(&sleeping_list);
+
+	while (curr_elem != last_elem)
+	{
+		struct thread *this_thread = list_entry(curr_elem, struct thread, elem);
+		if (this_thread->tid == id)
+		{
+			return this_thread;
+		}
+		curr_elem = list_next(curr_elem);
+	}
+	
+	return NULL;
+
 }

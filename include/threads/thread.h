@@ -143,7 +143,7 @@ struct thread
 	// exit and wait setting
 	struct thread *parent;
 	struct list children;
-	struct lock *wait_lock;	
+	struct lock *exit_wait_lock;	
 	bool wait_complete;	//need to be initialized "false"
 	
 	// for file syscall
@@ -151,7 +151,8 @@ struct thread
 	int next_fd;
 
 	// for fork
-	struct intr_frame uf;
+	struct intr_frame uf;	//userland context
+	struct semaphore *sema_fork;
 
 };
 
@@ -189,6 +190,8 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
+
+struct thread *get_child_by_id(tid_t id);
 
 void do_iret(struct intr_frame *tf);
 
