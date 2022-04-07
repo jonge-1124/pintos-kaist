@@ -206,7 +206,7 @@ int
 
 	for (token = strtok_r(cmd_line, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
 	{
-		sprintf(argv[argc], token);
+		argv[argc] = token;
 		argc++;
 	}
 	argv[argc] = NULL;
@@ -544,7 +544,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	
+
 	success = true;
 
 done:

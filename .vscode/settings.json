@@ -6,6 +6,7 @@
         "syscall-nr.h": "c",
         "list.h": "c",
         "mmu.h": "c",
-        "palloc.h": "c"
+        "palloc.h": "c",
+        "file.h": "c"
     }
 }
