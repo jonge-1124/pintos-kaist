@@ -121,10 +121,6 @@ void thread_init(void)
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid();
 	
-	initial_thread->next_fd = 2;
-	initial_thread->wait_complete = false;
-	lock_init(initial_thread->exit_wait_lock);
-	lock_acquire(initial_thread->exit_wait_lock);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -212,6 +208,11 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	//project2
+	t->parent = current;
+
+	list_push_front(&current->children, &t->child);
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -629,12 +630,13 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	t->nice = nice;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
+
 	//exit & wait
-	lock_init(t->exit_wait_lock);
-	lock_acquire(t->exit_wait_lock);
+	list_init(&t->children);
+	sema_init(t->exit_wait_sema,0);
+	t->wait_complete = false;
 
 	//fd
-	t->next_fd = 2;
 	sema_init(t->sema_fork,0);
 	
 }

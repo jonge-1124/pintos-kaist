@@ -94,12 +94,6 @@ struct donation
 	struct list_elem elem;
 };
 
-struct fd_entity
-{
-	struct file *file;
-	int fd;
-	bool is_open;
-};
 
 struct thread
 {
@@ -136,20 +130,19 @@ struct thread
 	unsigned magic;		  /* Detects stack overflow. */
 
 	//project2
-	
 	int exit_status; 
 	const char *thread_name;
 	
 	// exit and wait setting
 	struct thread *parent;
+	struct list_elem child;
 	struct list children;
-	struct lock *exit_wait_lock;	
+	
+	struct semaphore *exit_wait_sema;	
 	bool wait_complete;	//need to be initialized "false"
 	
 	// for file syscall
-	struct fd_entity file_table[128];
-	int next_fd;
-
+	struct file *file_table[128];
 	// for fork
 	struct intr_frame uf;	//userland context
 	struct semaphore *sema_fork;

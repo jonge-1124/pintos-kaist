@@ -87,7 +87,6 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	// wait
 	sema_down(&child->sema_fork);
-	list_push_front(&thread_current()->children, &child->elem);
 
 	return id;
 
@@ -168,18 +167,14 @@ __do_fork (void *aux) {
 
 	for (int i = 2; i < 128 ; i++)
 	{
-		if (parent->file_table[i].is_open && parent->file_table[i].file != NULL)
+		if (parent->file_table[i] != NULL)
 		{
-			struct file *duplicated_file = file_duplicate(parent->file_table[i].file);
-			current->file_table[i].file = duplicated_file;
-			current->file_table[i].fd = i;
-			current->file_table[i].is_open = true;
+			struct file *duplicated_file = file_duplicate(parent->file_table[i]);
+			current->file_table[i] = duplicated_file;
 		}
 	}
-	current->next_fd = parent->next_fd;
 
 	// signal finish duplicating resource
-	current->parent = parent;
 	sema_up(&current->sema_fork);
 
 	process_init ();
@@ -318,7 +313,7 @@ process_wait (tid_t child_tid UNUSED) {
 
 	while ( cur_elem != last_elem)
 	{
-		struct thread *this_thread = list_entry(cur_elem, struct thread, elem);
+		struct thread *this_thread = list_entry(cur_elem, struct thread, child);
 		if (this_thread->tid != child_tid)
 		{
 			child = this_thread;
@@ -330,7 +325,7 @@ process_wait (tid_t child_tid UNUSED) {
 	if (cur_elem == last_elem) return -1;
 	if (child->wait_complete) return -1;
 
-	lock_acquire(child->exit_wait_lock);
+	sema_down(child->exit_wait_sema);
 	return child->exit_status;
 }
 
