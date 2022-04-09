@@ -633,11 +633,17 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	//exit & wait
 	list_init(&t->children);
-	sema_init(t->exit_wait_sema,0);
+	sema_init(&t->exit_wait_sema, 0);
 	t->wait_complete = false;
 
+	//fork
+	sema_init(&t->sema_fork,0);
+
 	//fd
-	sema_init(t->sema_fork,0);
+	for (int i= 0; i<128; i++)
+	{
+		t->file_table[i] = NULL;
+	}
 	
 }
 

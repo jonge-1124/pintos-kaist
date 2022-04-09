@@ -110,10 +110,15 @@ void sema_up(struct semaphore *sema)
 	}
 
 	sema->value++;
+
 	struct list *ready_list = get_ready_list();
 	if (!list_empty(ready_list)){
 		struct thread *first_ready_thread = list_entry(list_front(ready_list), struct thread, elem);
-		if (first_ready_thread->priority > thread_current()->priority) thread_yield();
+		if (first_ready_thread->priority > thread_current()->priority) 
+		{
+			if (intr_context()) intr_yield_on_return();
+			else thread_yield();
+		}	
 	}
 	intr_set_level(old_level);
 }

@@ -286,5 +286,5 @@ void exit(int status)
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
 	thread_exit();
-	sema_up(curr->exit_wait_sema);
+	sema_up(&curr->exit_wait_sema);
 }

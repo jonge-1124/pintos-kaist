@@ -8,6 +8,7 @@
         "mmu.h": "c",
         "palloc.h": "c",
         "file.h": "c",
-        "filesys.h": "c"
+        "filesys.h": "c",
+        "synch.h": "c"
     }
 }

@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -119,15 +120,6 @@ struct thread
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
-#endif
-#ifdef VM
-	/* Table for whole virtual memory owned by thread. */
-	struct supplemental_page_table spt;
-#endif
-
-	/* Owned by thread.c. */
-	struct intr_frame tf; /* Information for switching */
-	unsigned magic;		  /* Detects stack overflow. */
 
 	//project2
 	int exit_status; 
@@ -138,14 +130,24 @@ struct thread
 	struct list_elem child;
 	struct list children;
 	
-	struct semaphore *exit_wait_sema;	
+	struct semaphore exit_wait_sema;	
 	bool wait_complete;	//need to be initialized "false"
 	
 	// for file syscall
 	struct file *file_table[128];
 	// for fork
 	struct intr_frame uf;	//userland context
-	struct semaphore *sema_fork;
+	struct semaphore sema_fork;
+#endif
+#ifdef VM
+	/* Table for whole virtual memory owned by thread. */
+	struct supplemental_page_table spt;
+#endif
+
+	/* Owned by thread.c. */
+	struct intr_frame tf; /* Information for switching */
+	unsigned magic;		  /* Detects stack overflow. */
+
 
 };
 

@@ -325,7 +325,7 @@ process_wait (tid_t child_tid UNUSED) {
 	if (cur_elem == last_elem) return -1;
 	if (child->wait_complete) return -1;
 
-	sema_down(child->exit_wait_sema);
+	sema_down(&child->exit_wait_sema);
 	return child->exit_status;
 }
 
@@ -544,8 +544,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
 	file_allow_write(file);
+	file_close (file);
+	
 	return success;
 }
 
