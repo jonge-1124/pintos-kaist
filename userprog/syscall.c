@@ -44,7 +44,7 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-
+	lock_init(&file_lock);
 	uint64_t sys_num = f->R.rax;
 	
 	switch(sys_num){
@@ -68,12 +68,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{	
 			is_valid_access(f->R.rdi);	// check *file pointer
 
-			char *fncopy = palloc_get_page(PAL_ZERO);
-			if (fncopy==NULL) exit(-1);
-
-			strlcpy(fncopy, f->R.rdi, strlen(f->R.rdi)+1);
-
-			if (process_exec(fncopy) == -1) exit(-1);
+			if (process_exec(f->R.rdi) == -1) exit(-1);
 
 			
 			break;
@@ -158,11 +153,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			struct thread *cur = thread_current();
 			struct file *f_read = cur->file_table[fd];
-			struct lock *file_lock;
 			int read_byte = 0;
 
 			is_valid_access(buffer);
-			lock_acquire(file_lock);
+			lock_acquire(&file_lock);
 
 			if (fd == 0)
 			{
@@ -188,7 +182,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					read_byte = -1;
 				}
 			}
-			lock_release(file_lock);
+			lock_release(&file_lock);
 			f->R.rax = read_byte;
 					
 			break;
@@ -201,12 +195,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			struct thread *cur = thread_current();
 			struct file *f_write = cur->file_table[fd];
-			struct lock *file_lock;
 			int write_byte = 0;
 
 			is_valid_access(buffer);
 
-			lock_acquire(file_lock);
+			lock_acquire(&file_lock);
 			if (fd == 0) write_byte = -1;
 			else if (fd == 1) 
 			{		
@@ -225,7 +218,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					write_byte = -1;
 				}	
 			}	
-			lock_release(file_lock);
+			lock_release(&file_lock);
 			f->R.rax = write_byte;
 			break;
 		}
@@ -274,9 +267,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		}
 	}
-
-	printf ("system call!\n");
-	thread_exit ();
 }
 
 
@@ -297,5 +287,4 @@ void exit(int status)
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
 	thread_exit();
-	sema_up(&curr->exit_wait_sema);
 }

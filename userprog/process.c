@@ -191,8 +191,8 @@ error:
  * Returns -1 on fail. */
 int 
  process_exec(void *f_name) {
-	
 	char *file_name = f_name;
+
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
@@ -245,7 +245,7 @@ process_wait (tid_t child_tid UNUSED) {
 	while ( cur_elem != last_elem)
 	{
 		struct thread *this_thread = list_entry(cur_elem, struct thread, child);
-		if (this_thread->tid != child_tid)
+		if (this_thread->tid == child_tid)
 		{
 			child = this_thread;
 			break;
@@ -253,8 +253,8 @@ process_wait (tid_t child_tid UNUSED) {
 		cur_elem = list_next(cur_elem);
 	}
 
-	if (cur_elem == last_elem) return -1;
-	if (child->wait_complete) return -1;
+	if (cur_elem == last_elem) return -1;	// not foudn
+	if (child->wait_complete) return -1;	//wait already implemented
 
 	sema_down(&child->exit_wait_sema);
 	child->wait_complete = true;
@@ -270,8 +270,9 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	printf ("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
+	printf("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
 	process_cleanup ();
+	sema_up(&curr->exit_wait_sema);
 }
 
 /* Free the current process's resources. */
@@ -384,12 +385,15 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	char fn_copy[128];
+	memcpy(fn_copy, file_name, strlen(file_name) + 1);
+
 	int argc = 0 ;
 	char *argv[64];
 	char *token, *save_ptr;
 	char *argv_address[64];
 
-	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL ; token = strtok_r(NULL, " ", &save_ptr))
+	for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL ; token = strtok_r(NULL, " ", &save_ptr))
 	{
 		argv[argc] = token;
 		argc++;
@@ -487,6 +491,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
+	
+
 	// put arguments into stack
 	for (int i = argc-1; i >= 0 ; i--)
 	{
@@ -500,7 +506,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	//word - align
 	int align = if_->rsp % 8;
 	if_->rsp -= align;
-	memset(if_->rsp,0,align );
+	memset(if_->rsp, 0, align );
+
+	
 
 	// memset 0 for argv[argc]
 	if_->rsp -= 8;
@@ -518,8 +526,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	memset(if_->rsp, 0, 8);
 
 	// set rsi, rdi
-	if_->R.rsi = argc;
-	if_->R.rdi = if_->rsp + 8;
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp + 8;
 
 
 	success = true;

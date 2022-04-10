@@ -211,7 +211,6 @@ tid_t thread_create(const char *name, int priority,
 
 	//project2
 	t->parent = current;
-
 	list_push_front(&current->children, &t->child);
 
 	/* Add to run queue. */
@@ -630,6 +629,8 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	t->nice = nice;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
+
+	t->thread_name = name;
 
 	//exit & wait
 	list_init(&t->children);
