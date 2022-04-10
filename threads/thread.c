@@ -213,6 +213,15 @@ tid_t thread_create(const char *name, int priority,
 	t->parent = current;
 	list_push_front(&current->children, &t->child);
 
+	// duplicate fd
+	for (int i=2; i<128; i++)
+	{
+		if (current->file_table[i] != NULL)
+		{
+			t->file_table[i] = file_duplicate(current->file_table[i]);
+		}
+	}
+
 	/* Add to run queue. */
 	thread_unblock(t);
 	if (current->priority < priority) thread_yield();
@@ -637,14 +646,15 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	sema_init(&t->exit_wait_sema, 0);
 	t->wait_complete = false;
 
-	//fork
-	sema_init(&t->sema_fork,0);
-
-	//fd
-	for (int i= 0; i<128; i++)
+	//fd table init
+	for (int i=2; i<128; i++)
 	{
 		t->file_table[i] = NULL;
 	}
+
+	//fork
+	sema_init(&t->sema_fork,0);
+
 	
 }
 

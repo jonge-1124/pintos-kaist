@@ -272,6 +272,8 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	printf("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
 	process_cleanup ();
+
+
 	sema_up(&curr->exit_wait_sema);
 }
 
@@ -400,6 +402,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	char *file_open = argv[0];
+	memcpy(t->thread_name, argv[0], strlen(argv[0])+1); 
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();

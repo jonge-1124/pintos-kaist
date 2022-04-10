@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/synch.h"
+#include "filesys/file.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -134,7 +135,7 @@ struct thread
 
 	//project2
 	int exit_status; 
-	const char *thread_name;
+	char *thread_name;
 	
 	// exit and wait setting
 	struct thread *parent;

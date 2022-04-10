@@ -8,6 +8,8 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "threads/palloc.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -105,19 +107,22 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				
 			if (file_open != NULL)
 			{
-				for (int i = 3; i < 128; i++)
+				for (int i = 2; i < 128; i++)
 				{
 					if (cur->file_table[i] == NULL) 
 					{
-						fd = i;
+						cur->file_table[i] = file_open;
+						f->R.rax = i;
 						break;
 					}
 					//file table is full, so close the given file
-					if (i==127 && cur->file_table[127] != NULL) file_close(file_open);
+					if (i==127 && cur->file_table[127] != NULL) 
+					{
+						file_close(file_open);
+						f->R.rax = -1;
+					}
 				}
 				
-				cur->file_table[fd] = file_open;
-				f->R.rax = fd;
 				
 			}
 			else
@@ -152,39 +157,42 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			unsigned size = f->R.rdx;
 
 			struct thread *cur = thread_current();
-			struct file *f_read = cur->file_table[fd];
-			int read_byte = 0;
+			if (0<= fd  && fd <128)
+			{
+				struct file *f_read = cur->file_table[fd];
+				int read_byte = 0;
 
-			is_valid_access(buffer);
-			lock_acquire(&file_lock);
+				is_valid_access(buffer);
+				lock_acquire(&file_lock);
 
-			if (fd == 0)
-			{
-				for (int i = 0; i < size ; i++)
+				if (fd == 0)
 				{
-					if (input_getc() == '\0') break;
-					else read_byte++;
+					for (int i = 0; i < size ; i++)
+					{
+						if (input_getc() == '\0') break;
+						else read_byte++;
+					}
+					
 				}
-				
-			}
-			else if (fd == 1)
-			{
-				read_byte = -1;
-			}
-			else
-			{
-				if (f_read != NULL)
-				{
-					read_byte = file_read(f_read, buffer, size);
-				}
-				else 
+				else if (fd == 1)
 				{
 					read_byte = -1;
 				}
+				else
+				{
+					if (f_read != NULL)
+					{
+						read_byte = file_read(f_read, buffer, size);
+					}
+					else 
+					{
+						read_byte = -1;
+					}
+				}
+				lock_release(&file_lock);
+				f->R.rax = read_byte;
 			}
-			lock_release(&file_lock);
-			f->R.rax = read_byte;
-					
+			else f->R.rax = -1;		
 			break;
 		}
 		case SYS_WRITE :
@@ -194,32 +202,36 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			unsigned size = f->R.rdx;
 
 			struct thread *cur = thread_current();
-			struct file *f_write = cur->file_table[fd];
-			int write_byte = 0;
-
-			is_valid_access(buffer);
-
-			lock_acquire(&file_lock);
-			if (fd == 0) write_byte = -1;
-			else if (fd == 1) 
-			{		
-				putbuf(buffer, size);
-				write_byte = size;
-					
-			}
-			else 
+			if (0<=fd && fd<128)
 			{
-				if (f_write != NULL)
-				{
-					write_byte = file_write(f_write, buffer, size);
+				struct file *f_write = cur->file_table[fd];
+				int write_byte = 0;
+
+				is_valid_access(buffer);
+
+				lock_acquire(&file_lock);
+				if (fd == 0) write_byte = -1;
+				else if (fd == 1) 
+				{		
+					putbuf(buffer, size);
+					write_byte = size;
+						
 				}
-				else
+				else 
 				{
-					write_byte = -1;
+					if (f_write != NULL)
+					{
+						write_byte = file_write(f_write, buffer, size);
+					}
+					else
+					{
+						write_byte = -1;
+					}	
 				}	
-			}	
-			lock_release(&file_lock);
-			f->R.rax = write_byte;
+				lock_release(&file_lock);
+				f->R.rax = write_byte;
+			}
+			else f->R.rax = -1;	
 			break;
 		}
 		case SYS_SEEK : 
@@ -255,15 +267,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		case SYS_CLOSE :
 		{
+			
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			struct file *f_close = cur->file_table[fd];
-
-			if (f_close != NULL)
+			if (1<fd && fd < 128)
 			{
+				struct file *f_close = cur->file_table[fd];
 				file_close(f_close);
+				cur->file_table[fd] = NULL;
 			}
-
+			
 			break;
 		}
 	}

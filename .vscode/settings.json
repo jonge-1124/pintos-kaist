@@ -9,6 +9,7 @@
         "palloc.h": "c",
         "file.h": "c",
         "filesys.h": "c",
-        "synch.h": "c"
+        "synch.h": "c",
+        "off_t.h": "c"
     }
 }
