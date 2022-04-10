@@ -121,6 +121,17 @@ struct thread
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
 
+	
+#endif
+#ifdef VM
+	/* Table for whole virtual memory owned by thread. */
+	struct supplemental_page_table spt;
+#endif
+
+	/* Owned by thread.c. */
+	struct intr_frame tf; /* Information for switching */
+	unsigned magic;		  /* Detects stack overflow. */
+
 	//project2
 	int exit_status; 
 	const char *thread_name;
@@ -138,15 +149,6 @@ struct thread
 	// for fork
 	struct intr_frame uf;	//userland context
 	struct semaphore sema_fork;
-#endif
-#ifdef VM
-	/* Table for whole virtual memory owned by thread. */
-	struct supplemental_page_table spt;
-#endif
-
-	/* Owned by thread.c. */
-	struct intr_frame tf; /* Information for switching */
-	unsigned magic;		  /* Detects stack overflow. */
 
 
 };

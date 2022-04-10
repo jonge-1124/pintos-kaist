@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -66,7 +67,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_EXEC :
 		{	
 			is_valid_access(f->R.rdi);	// check *file pointer
-			if (process_exec(f->R.rdi) == -1) exit(-1);
+
+			char *fncopy = palloc_get_page(PAL_ZERO);
+			if (fncopy==NULL) exit(-1);
+
+			strlcpy(fncopy, f->R.rdi, strlen(f->R.rdi)+1);
+
+			if (process_exec(fncopy) == -1) exit(-1);
+
+			
 			break;
 		}
 
@@ -273,11 +282,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 void is_valid_access(void *va)
 {
-	if (va == NULL) return exit(-1);
-	if (is_kernel_vaddr(va)) return exit(-1);
+	if (va == NULL) exit(-1);
+	if (is_kernel_vaddr(va))  exit(-1);
 
 	void *page = pml4_get_page(thread_current()->pml4,va);
-	if (page==NULL) return exit(-1);
+	if (page==NULL) exit(-1);
+
+	return;
 
 }
 

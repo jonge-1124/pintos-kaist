@@ -190,23 +190,10 @@ error:
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int 
- process_exec(char *cmd_line) {
-	char *file_name;
+ process_exec(void *f_name) {
+	
+	char *file_name = f_name;
 	bool success;
-
-
-	char *token, save_ptr;
-	char *argv[100];
-	int argc = 0;
-
-	for (token = strtok_r(cmd_line, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-	{
-		argv[argc] = token;
-		argc++;
-	}
-	argv[argc] = NULL;
-
-	file_name = argv[0];
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -216,68 +203,12 @@ int
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
-	
 
 	/* We first kill the current context */
 	process_cleanup ();
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
-
-	void **f_sp = &_if.rsp;
-	uintptr_t argv_stack_addr[argc];
-	int total_size_argv = 0;
-
-	// push argv contents to the stack
-	for (int i = argc-1 ; i >= 0 ; i--)
-	{
-		int size = strlen(argv[i]);
-		*f_sp--;
-		**(char **)f_sp = '\0';
-		for (int j = size ; j >=1 ; j--)
-		{
-			*f_sp--;
-			**(char**)f_sp = argv[i][j];
-		}
-		total_size_argv = total_size_argv + size;
-		argv_stack_addr[i] = *f_sp;
-
-	}
-
-	//word aligne for rsp
-	int extra_word_align = 0;
-	int eight_multiple = 0;
-
-	while(eight_multiple < total_size_argv) {
-		eight_multiple = eight_multiple + 8;
-	}
-
-	extra_word_align = eight_multiple - total_size_argv;
-	for (int i = 0; i < extra_word_align; i++)
-	{
-		*f_sp--;
-		**(char **)f_sp = 0;
-	}
-
-	// push argv address to the stack
-	*f_sp = *f_sp - 8 ;
-	**(uintptr_t **)f_sp = 0;
-	for (int i = argc-1; i >= 0; i--)
-	{
-		*f_sp = *f_sp - 8;
-		**(uintptr_t **)f_sp = argv_stack_addr[argc];
-	}
-
-	// push return address to the stack
-	for (int i = 8; i >0 ; i--)
-	{
-		*f_sp--;
-		**(char **)f_sp = 0;
-	}
-
-	_if.R.rsi = argv_stack_addr[0];
-	_if.R.rdi = argc;
-
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -326,6 +257,8 @@ process_wait (tid_t child_tid UNUSED) {
 	if (child->wait_complete) return -1;
 
 	sema_down(&child->exit_wait_sema);
+	child->wait_complete = true;
+	list_remove(&child->child);
 	return child->exit_status;
 }
 
@@ -451,17 +384,31 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	int argc = 0 ;
+	char *argv[64];
+	char *token, *save_ptr;
+	char *argv_address[64];
+
+	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL ; token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argv[argc] = token;
+		argc++;
+	}
+
+	char *file_open = argv[0];
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
 
+
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (file_open);
 	file_deny_write(file);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", file_open);
 		goto done;
 	}
 
@@ -473,7 +420,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			|| ehdr.e_version != 1
 			|| ehdr.e_phentsize != sizeof (struct Phdr)
 			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
+		printf ("load: %s: error loading executable\n", file_open);
 		goto done;
 	}
 
@@ -539,6 +486,41 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+
+	// put arguments into stack
+	for (int i = argc-1; i >= 0 ; i--)
+	{
+		int size = strlen(argv[i]) + 1;
+		if_->rsp -= size;
+		memcpy(if_->rsp, argv[i], size);
+		argv_address[i] = if_->rsp;
+	}
+
+
+	//word - align
+	int align = if_->rsp % 8;
+	if_->rsp -= align;
+	memset(if_->rsp,0,align );
+
+	// memset 0 for argv[argc]
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, 8);
+
+	// put address of arguments into stack
+	for (int i = argc-1; i >=0; i--)
+	{
+		if_->rsp -= 8;
+		memcpy(if_->rsp, &argv_address[i], 8);
+	}
+
+	// put return address
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, 8);
+
+	// set rsi, rdi
+	if_->R.rsi = argc;
+	if_->R.rdi = if_->rsp + 8;
+
 
 	success = true;
 
