@@ -104,13 +104,15 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;      
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-	if (is_kernel_vaddr(va)) return false;
+	if (is_kernel_vaddr(va)) return true;
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL) return false;
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
 	newpage = palloc_get_page(PAL_USER);
+	if (newpage == NULL) return false;
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
@@ -143,6 +145,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -165,14 +168,17 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+	
+
 	for (int i = 2; i < 128 ; i++)
 	{
 		if (parent->file_table[i] != NULL)
 		{
-			struct file *duplicated_file = file_duplicate(parent->file_table[i]);
-			current->file_table[i] = duplicated_file;
+			current->file_table[i] = file_duplicate(parent->file_table[i]);
 		}
 	}
+
+	
 
 	// signal finish duplicating resource
 	sema_up(&current->sema_fork);
@@ -253,7 +259,7 @@ process_wait (tid_t child_tid UNUSED) {
 		cur_elem = list_next(cur_elem);
 	}
 
-	if (cur_elem == last_elem) return -1;	// not foudn
+	if (cur_elem == last_elem) return -1;	// not found
 	if (child->wait_complete) return -1;	//wait already implemented
 
 	sema_down(&child->exit_wait_sema);
@@ -270,10 +276,11 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	printf("%s: exit(%d)\n", curr->thread_name, curr->exit_status);
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+	
+	
+	
 	process_cleanup ();
-
-
 	sema_up(&curr->exit_wait_sema);
 }
 
@@ -387,7 +394,10 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
-	char fn_copy[128];
+	char *fn_copy = palloc_get_page(PAL_ZERO);
+	if (fn_copy == NULL) return false;
+	
+
 	memcpy(fn_copy, file_name, strlen(file_name) + 1);
 
 	int argc = 0 ;
@@ -402,7 +412,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	char *file_open = argv[0];
-	memcpy(t->thread_name, argv[0], strlen(argv[0])+1); 
+	
+	if (t->check_name == 0)
+	{
+		memcpy(t->name, file_open, strlen(file_open)+1); 
+		t->check_name++;
+	}
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -413,7 +428,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	file = filesys_open (file_open);
-	file_deny_write(file);
+	if (file != NULL) {file_deny_write(file);}
+	
+
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_open);
 		goto done;
@@ -535,9 +552,13 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	success = true;
 
+	palloc_free_page(fn_copy);
+	
+
+
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_allow_write(file);
+	if (file != NULL) file_allow_write(file);
 	file_close (file);
 	
 	return success;

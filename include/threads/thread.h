@@ -135,7 +135,6 @@ struct thread
 
 	//project2
 	int exit_status; 
-	char *thread_name;
 	
 	// exit and wait setting
 	struct thread *parent;
@@ -151,6 +150,7 @@ struct thread
 	struct intr_frame uf;	//userland context
 	struct semaphore sema_fork;
 
+	int check_name;
 
 };
 

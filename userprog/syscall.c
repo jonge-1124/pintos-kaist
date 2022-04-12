@@ -40,13 +40,14 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	lock_init(&file_lock);
 }
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	lock_init(&file_lock);
+	
 	uint64_t sys_num = f->R.rax;
 	
 	switch(sys_num){
@@ -68,9 +69,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		case SYS_EXEC :
 		{	
-			is_valid_access(f->R.rdi);	// check *file pointer
+			is_valid_access(f->R.rdi);	
 
-			if (process_exec(f->R.rdi) == -1) exit(-1);
+			char *fn_copy = palloc_get_page(PAL_ZERO);
+			if (fn_copy == NULL) exit(-1);
+			memcpy(fn_copy, f->R.rdi, strlen(f->R.rdi) + 1);
+			
+			if (process_exec(fn_copy) == -1) exit(-1);
 
 			
 			break;
@@ -155,14 +160,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			void *buffer = f->R.rsi;
 			unsigned size = f->R.rdx;
-
+			is_valid_access(buffer);
 			struct thread *cur = thread_current();
-			if (0<= fd  && fd <128)
+
+			if (0 <= fd  && fd <128)
 			{
 				struct file *f_read = cur->file_table[fd];
+				
 				int read_byte = 0;
 
-				is_valid_access(buffer);
 				lock_acquire(&file_lock);
 
 				if (fd == 0)
@@ -180,14 +186,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				}
 				else
 				{
-					if (f_read != NULL)
-					{
-						read_byte = file_read(f_read, buffer, size);
-					}
-					else 
-					{
-						read_byte = -1;
-					}
+					if (f_read == NULL) exit(-1);
+					read_byte = file_read(f_read, buffer, size);
+					
+					
 				}
 				lock_release(&file_lock);
 				f->R.rax = read_byte;
@@ -200,14 +202,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			void *buffer = f->R.rsi;
 			unsigned size = f->R.rdx;
+			is_valid_access(buffer);
 
 			struct thread *cur = thread_current();
 			if (0<=fd && fd<128)
 			{
 				struct file *f_write = cur->file_table[fd];
+				
 				int write_byte = 0;
-
-				is_valid_access(buffer);
 
 				lock_acquire(&file_lock);
 				if (fd == 0) write_byte = -1;
@@ -219,14 +221,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				}
 				else 
 				{
-					if (f_write != NULL)
-					{
-						write_byte = file_write(f_write, buffer, size);
-					}
-					else
-					{
-						write_byte = -1;
-					}	
+					if (f_write == NULL) exit(-1);
+
+					write_byte = file_write(f_write, buffer, size);
+
 				}	
 				lock_release(&file_lock);
 				f->R.rax = write_byte;

@@ -213,14 +213,6 @@ tid_t thread_create(const char *name, int priority,
 	t->parent = current;
 	list_push_front(&current->children, &t->child);
 
-	// duplicate fd
-	for (int i=2; i<128; i++)
-	{
-		if (current->file_table[i] != NULL)
-		{
-			t->file_table[i] = file_duplicate(current->file_table[i]);
-		}
-	}
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -639,21 +631,24 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	t->nice = nice;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
 
-	t->thread_name = name;
-
 	//exit & wait
 	list_init(&t->children);
 	sema_init(&t->exit_wait_sema, 0);
 	t->wait_complete = false;
 
-	//fd table init
-	for (int i=2; i<128; i++)
+	
+	//file table initialize
+	for (int i = 0; i < 128; i++)
 	{
 		t->file_table[i] = NULL;
 	}
 
+
 	//fork
 	sema_init(&t->sema_fork,0);
+
+	//thread name
+	t->check_name = 0;
 
 	
 }
@@ -852,28 +847,15 @@ struct list *get_ready_list(void)
 
 struct thread *get_child_by_id(tid_t id)
 {
+	struct thread *curr = thread_current();
 	
 	// check ready_list
-	struct list_elem *curr_elem = list_begin(&ready_list);
-	struct list_elem *last_elem = list_end(&ready_list);
+	struct list_elem *curr_elem = list_begin(&curr->children);
+	struct list_elem *last_elem = list_end(&curr->children);
 
 	while (curr_elem != last_elem)
 	{
-		struct thread *this_thread = list_entry(curr_elem, struct thread, elem);
-		if (this_thread->tid == id)
-		{
-			return this_thread;
-		}
-		curr_elem = list_next(curr_elem);
-	}
-
-	//check sleeping_list
-	curr_elem = list_begin(&sleeping_list);
-	last_elem = list_end(&sleeping_list);
-
-	while (curr_elem != last_elem)
-	{
-		struct thread *this_thread = list_entry(curr_elem, struct thread, elem);
+		struct thread *this_thread = list_entry(curr_elem, struct thread, child);
 		if (this_thread->tid == id)
 		{
 			return this_thread;
