@@ -50,10 +50,19 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char *copy = palloc_get_page(0);
+	char *extract_name, save_ptr;
+
+	if (copy == NULL) return TID_ERROR;
+	strlcpy(copy, file_name, PGSIZE );
+
+	extract_name = strtok_r(copy, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (extract_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
+	palloc_free_page(copy);	
 	return tid;
 }
 
@@ -186,6 +195,7 @@ __do_fork (void *aux) {
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
+	
 	if (succ)
 		do_iret (&if_);
 error:
@@ -212,7 +222,7 @@ int
 
 	/* We first kill the current context */
 	process_cleanup ();
-
+	
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
@@ -221,9 +231,14 @@ int
 	if (!success)
 		return -1;
 
+	
 	/* Start switched process. */
 	do_iret (&_if);
+
 	NOT_REACHED ();
+	
+	
+	
 }
 
 
@@ -261,9 +276,11 @@ process_wait (tid_t child_tid UNUSED) {
 
 	if (cur_elem == last_elem) return -1;	// not found
 	if (child->wait_complete) return -1;	//wait already implemented
+	
 
 	sema_down(&child->exit_wait_sema);
 	child->wait_complete = true;
+	
 	list_remove(&child->child);
 	return child->exit_status;
 }
@@ -278,9 +295,17 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	
-	
+	file_close(curr->exec_file);
+	for (int i = 2; i<128; i++)
+	{
+		file_close(curr->file_table[i]);	
+	}
 	
 	process_cleanup ();
+
+
+
+
 	sema_up(&curr->exit_wait_sema);
 }
 
@@ -412,12 +437,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	char *file_open = argv[0];
-	
-	if (t->check_name == 0)
-	{
-		memcpy(t->name, file_open, strlen(file_open)+1); 
-		t->check_name++;
-	}
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -428,7 +447,13 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	file = filesys_open (file_open);
-	if (file != NULL) {file_deny_write(file);}
+	if (file != NULL) 
+	{
+		file_deny_write(file);
+		file_close(t->exec_file);
+		t->exec_file = file;
+	}
+	
 	
 
 	if (file == NULL) {
@@ -507,6 +532,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
+	
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
@@ -558,9 +584,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	if (file != NULL) file_allow_write(file);
-	file_close (file);
 	
+	
+	
+
 	return success;
 }
 

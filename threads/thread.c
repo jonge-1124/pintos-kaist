@@ -638,6 +638,7 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	
 	//file table initialize
+	
 	for (int i = 0; i < 128; i++)
 	{
 		t->file_table[i] = NULL;
@@ -646,11 +647,9 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	//fork
 	sema_init(&t->sema_fork,0);
+	t->exec_file = NULL;
 
-	//thread name
-	t->check_name = 0;
 
-	
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

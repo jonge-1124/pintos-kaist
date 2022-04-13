@@ -108,6 +108,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct thread *cur = thread_current();
 			is_valid_access(f->R.rdi);	
 			struct file *file_open = filesys_open(f->R.rdi);
+			
+			//if file_open is being executed, deny write on it
+
 			int fd;
 				
 			if (file_open != NULL)
@@ -169,15 +172,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				
 				int read_byte = 0;
 
-				lock_acquire(&file_lock);
+				
 
 				if (fd == 0)
 				{
+					lock_acquire(&file_lock);
 					for (int i = 0; i < size ; i++)
 					{
 						if (input_getc() == '\0') break;
 						else read_byte++;
 					}
+					lock_release(&file_lock);
 					
 				}
 				else if (fd == 1)
@@ -186,12 +191,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				}
 				else
 				{
-					if (f_read == NULL) exit(-1);
-					read_byte = file_read(f_read, buffer, size);
-					
-					
+					if (f_read == NULL) read_byte = -1;
+					else
+					{
+						lock_acquire(&file_lock);
+						read_byte = file_read(f_read, buffer, size);
+						lock_release(&file_lock);
+					}
 				}
-				lock_release(&file_lock);
+				
 				f->R.rax = read_byte;
 			}
 			else f->R.rax = -1;		
@@ -205,28 +213,35 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			is_valid_access(buffer);
 
 			struct thread *cur = thread_current();
+
 			if (0<=fd && fd<128)
 			{
 				struct file *f_write = cur->file_table[fd];
 				
 				int write_byte = 0;
 
-				lock_acquire(&file_lock);
+				
 				if (fd == 0) write_byte = -1;
 				else if (fd == 1) 
 				{		
+					lock_acquire(&file_lock);
 					putbuf(buffer, size);
+					lock_release(&file_lock);
 					write_byte = size;
 						
 				}
 				else 
 				{
-					if (f_write == NULL) exit(-1);
-
-					write_byte = file_write(f_write, buffer, size);
+					if (f_write == NULL) write_byte = -1;
+					else
+					{
+						lock_acquire(&file_lock);
+						write_byte = file_write(f_write, buffer, size);
+						lock_release(&file_lock);
+					}
 
 				}	
-				lock_release(&file_lock);
+				
 				f->R.rax = write_byte;
 			}
 			else f->R.rax = -1;	

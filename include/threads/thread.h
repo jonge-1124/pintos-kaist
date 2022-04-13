@@ -150,7 +150,8 @@ struct thread
 	struct intr_frame uf;	//userland context
 	struct semaphore sema_fork;
 
-	int check_name;
+	//executable file pointer
+	struct file *exec_file;
 
 };
 

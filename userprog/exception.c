@@ -145,6 +145,12 @@ page_fault (struct intr_frame *f) {
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
+	if ((not_present && user) || (user && is_kernel_vaddr(fault_addr)))
+	{
+		struct thread *curr = thread_current();
+		curr->exit_status = -1;
+		thread_exit();
+	}
 
 	/* Count page faults. */
 	page_fault_cnt++;
@@ -156,5 +162,7 @@ page_fault (struct intr_frame *f) {
 			write ? "writing" : "reading",
 			user ? "user" : "kernel");
 	kill (f);
+
+	
 }
 
