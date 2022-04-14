@@ -50,8 +50,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	
 	uint64_t sys_num = f->R.rax;
 	
+	
 	switch(sys_num){
 		case SYS_HALT : 
+			
 			power_off();
 			break;
 		
@@ -115,11 +117,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				
 			if (file_open != NULL)
 			{
+				
 				for (int i = 2; i < 128; i++)
 				{
-					if (cur->file_table[i] == NULL) 
+					if (cur->file_table[i]== NULL) 
 					{
-						cur->file_table[i] = file_open;
+						cur->file_table[i]= file_open;
 						f->R.rax = i;
 						break;
 					}
@@ -285,14 +288,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct thread *cur = thread_current();
 			if (1<fd && fd < 128)
 			{
+				
 				struct file *f_close = cur->file_table[fd];
 				file_close(f_close);
 				cur->file_table[fd] = NULL;
+				
 			}
 			
 			break;
 		}
 	}
+	
 }
 
 

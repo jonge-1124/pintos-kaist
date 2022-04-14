@@ -121,6 +121,7 @@ struct thread
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
+	
 
 	
 #endif
@@ -135,23 +136,23 @@ struct thread
 
 	//project2
 	int exit_status; 
+	struct file *executable;
 	
 	// exit and wait setting
 	struct thread *parent;
 	struct list_elem child;
 	struct list children;
+	struct semaphore eliminated;
 	
 	struct semaphore exit_wait_sema;	
 	bool wait_complete;	//need to be initialized "false"
 	
 	// for file syscall
-	struct file *file_table[128];
+	struct file **file_table;
+
 	// for fork
 	struct intr_frame uf;	//userland context
 	struct semaphore sema_fork;
-
-	//executable file pointer
-	struct file *exec_file;
 
 };
 

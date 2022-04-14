@@ -62,6 +62,7 @@ process_create_initd (const char *file_name) {
 	tid = thread_create (extract_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
+
 	palloc_free_page(copy);	
 	return tid;
 }
@@ -178,7 +179,7 @@ __do_fork (void *aux) {
 	 * TODO:       the resources of parent.*/
 
 	
-
+	
 	for (int i = 2; i < 128 ; i++)
 	{
 		if (parent->file_table[i] != NULL)
@@ -186,8 +187,6 @@ __do_fork (void *aux) {
 			current->file_table[i] = file_duplicate(parent->file_table[i]);
 		}
 	}
-
-	
 
 	// signal finish duplicating resource
 	sema_up(&current->sema_fork);
@@ -223,9 +222,15 @@ int
 	/* We first kill the current context */
 	process_cleanup ();
 	
-	/* And then load the binary */
-	success = load (file_name, &_if);
 
+	struct lock load_lock;
+	lock_init(&load_lock);
+	lock_acquire(&load_lock);
+	/* And then load the binary */
+	success = load(file_name, &_if);
+	lock_release(&load_lock);
+
+	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -279,10 +284,13 @@ process_wait (tid_t child_tid UNUSED) {
 	
 
 	sema_down(&child->exit_wait_sema);
-	child->wait_complete = true;
 	
+	int exit_status = child->exit_status;
+	child->wait_complete = true;
 	list_remove(&child->child);
-	return child->exit_status;
+	sema_up(&child->eliminated);
+
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -295,18 +303,33 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	
-	file_close(curr->exec_file);
+	
+	
+	file_close(curr->executable);
+
+	
 	for (int i = 2; i<128; i++)
 	{
-		file_close(curr->file_table[i]);	
+		file_close(curr->file_table[i]);
+	}
+	palloc_free_page(curr->file_table);
+	
+	
+	struct list_elem *cur_elem = list_begin(&curr->children);
+	struct list_elem *last_elem = list_end(&curr->children);
+
+	while ( cur_elem != last_elem)
+	{
+		struct thread *this_thread = list_entry(cur_elem, struct thread, child);
+		sema_up(&this_thread->eliminated);
+		cur_elem = list_next(cur_elem);
 	}
 	
 	process_cleanup ();
 
-
-
-
 	sema_up(&curr->exit_wait_sema);
+
+	sema_down(&curr->eliminated);	// if "exit" before "wait", then wait for parent to "wait"
 }
 
 /* Free the current process's resources. */
@@ -419,7 +442,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
-	char *fn_copy = palloc_get_page(PAL_ZERO);
+	char *fn_copy = palloc_get_page(0);
 	if (fn_copy == NULL) return false;
 	
 
@@ -446,20 +469,19 @@ load (const char *file_name, struct intr_frame *if_) {
 
 
 	/* Open executable file. */
+	
 	file = filesys_open (file_open);
-	if (file != NULL) 
+	if (file != NULL)
 	{
 		file_deny_write(file);
-		file_close(t->exec_file);
-		t->exec_file = file;
+		t->executable = file;
 	}
-	
-	
 
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_open);
 		goto done;
 	}
+	
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -584,10 +606,6 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	
-	
-	
-
 	return success;
 }
 

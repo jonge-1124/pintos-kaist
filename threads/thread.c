@@ -212,6 +212,7 @@ tid_t thread_create(const char *name, int priority,
 	//project2
 	t->parent = current;
 	list_push_front(&current->children, &t->child);
+	t->file_table = palloc_get_page(PAL_ZERO);
 
 
 	/* Add to run queue. */
@@ -634,21 +635,15 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	//exit & wait
 	list_init(&t->children);
 	sema_init(&t->exit_wait_sema, 0);
+	sema_init(&t->eliminated, 0);
 	t->wait_complete = false;
-
-	
-	//file table initialize
-	
-	for (int i = 0; i < 128; i++)
-	{
-		t->file_table[i] = NULL;
-	}
 
 
 	//fork
 	sema_init(&t->sema_fork,0);
-	t->exec_file = NULL;
 
+	//executing file 
+	t->executable = NULL;
 
 }
 
