@@ -10,6 +10,7 @@
 #include "threads/palloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -40,7 +41,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-	lock_init(&file_lock);
+	lock_init(&file_lock);	
 }
 
 /* The main system call interface */
@@ -65,6 +66,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		case SYS_FORK :
 		{	
+			is_valid_access(f->R.rdi);
 			f->R.rax = process_fork(f->R.rdi, f);
 			break;
 		}
@@ -110,9 +112,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct thread *cur = thread_current();
 			is_valid_access(f->R.rdi);	
 			struct file *file_open = filesys_open(f->R.rdi);
-			
-			//if file_open is being executed, deny write on it
-
+		
 			int fd;
 				
 			if (file_open != NULL)
@@ -120,7 +120,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				
 				for (int i = 2; i < 128; i++)
 				{
-					if (cur->file_table[i]== NULL) 
+					if (cur->file_table[i] == NULL) 
 					{
 						cur->file_table[i]= file_open;
 						f->R.rax = i;
@@ -130,6 +130,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					if (i==127 && cur->file_table[127] != NULL) 
 					{
 						file_close(file_open);
+						
 						f->R.rax = -1;
 					}
 				}
@@ -318,5 +319,7 @@ void exit(int status)
 {
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	thread_exit();
+	
 }

@@ -210,10 +210,14 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	//project2
-	t->parent = current;
-	list_push_front(&current->children, &t->child);
 	t->file_table = palloc_get_page(PAL_ZERO);
+	for (int i = 0; i < 128; i++)
+	{
+		t->file_table[i] = NULL;
+	}
 
+	
+	list_push_front(&current->children, &t->child);
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -638,6 +642,7 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	sema_init(&t->eliminated, 0);
 	t->wait_complete = false;
 
+	
 
 	//fork
 	sema_init(&t->sema_fork,0);

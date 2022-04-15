@@ -149,6 +149,7 @@ page_fault (struct intr_frame *f) {
 	{
 		struct thread *curr = thread_current();
 		curr->exit_status = -1;
+		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 		thread_exit();
 	}
 
