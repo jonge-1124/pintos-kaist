@@ -316,6 +316,17 @@ process_exit (void) {
 
 	palloc_free_page(curr->file_table);
 	
+	struct list_elem *curr_elem = list_begin(&curr->children);
+	struct list_elem *last_elem = list_end(&curr->children);
+
+	while(curr_elem != last_elem)
+	{
+		struct thread *child = list_entry(curr_elem, struct thread, child);
+		sema_up(&child->eliminated);
+		curr_elem = list_next(curr_elem);
+	}
+
+	
 	
 	process_cleanup ();
 
