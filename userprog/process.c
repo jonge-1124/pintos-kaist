@@ -186,7 +186,7 @@ __do_fork (void *aux) {
 
 	
 	
-	for (int i = 2; i < 128 ; i++)
+	for (int i = 2; i < 131 ; i++)
 	{
 		if (parent->file_table[i] != NULL)
 		{
@@ -286,12 +286,11 @@ process_wait (tid_t child_tid UNUSED) {
 
 	if (cur_elem == last_elem) return -1;	// not found
 	if (child->wait_complete) return -1;	//wait already implemented
-	
+	child->wait_complete = true;
 
 	sema_down(&child->exit_wait_sema);
 	
 	int exit_status = child->exit_status;
-	child->wait_complete = true;
 	list_remove(&child->child);
 	sema_up(&child->eliminated);
 
@@ -306,12 +305,13 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	
+
 	file_close(curr->executable);
 	
-	for (int i = 2; i < 128; i++)
+	for (int i = 2; i < 131; i++)
 	{
 		file_close(curr->file_table[i]);
+		curr->file_table[i] = NULL;
 	}
 
 	palloc_free_page(curr->file_table);
@@ -322,18 +322,16 @@ process_exit (void) {
 	while(curr_elem != last_elem)
 	{
 		struct thread *child = list_entry(curr_elem, struct thread, child);
-		sema_up(&child->eliminated);
+		process_wait(child->tid);
 		curr_elem = list_next(curr_elem);
 	}
 
-	
 	
 	process_cleanup ();
 
 	sema_up(&curr->exit_wait_sema);
 
 	sema_down(&curr->eliminated);
-	
 	
 }
 
@@ -606,8 +604,6 @@ load (const char *file_name, struct intr_frame *if_) {
 
 
 	success = true;
-
-	
 
 done:
 	/* We arrive here whether the load is successful or not. */

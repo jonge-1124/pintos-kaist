@@ -118,7 +118,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			if (file_open != NULL)
 			{
 				
-				for (int i = 2; i < 128; i++)
+				for (int i = 2; i < 131; i++)
 				{
 					if (cur->file_table[i] == NULL) 
 					{
@@ -127,7 +127,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 						break;
 					}
 					//file table is full, so close the given file
-					if (i==127 && cur->file_table[127] != NULL) 
+					if (i == 130 && cur->file_table[130] != NULL) 
 					{
 						file_close(file_open);
 						
@@ -170,7 +170,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			is_valid_access(buffer);
 			struct thread *cur = thread_current();
 
-			if (0 <= fd  && fd <128)
+			if (0 <= fd  && fd <131)
 			{
 				struct file *f_read = cur->file_table[fd];
 				
@@ -218,7 +218,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			struct thread *cur = thread_current();
 
-			if (0<=fd && fd<128)
+			if (0<=fd && fd<131)
 			{
 				struct file *f_write = cur->file_table[fd];
 				
@@ -287,7 +287,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			if (1<fd && fd < 128)
+			if (1<fd && fd < 131)
 			{
 				
 				struct file *f_close = cur->file_table[fd];
