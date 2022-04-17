@@ -93,9 +93,9 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	memcpy(&thread_current()->uf, if_, sizeof(struct intr_frame));
 	
 	tid_t id = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
-	
-	struct thread *child = get_child_by_id(id);
+	if (id == TID_ERROR) return TID_ERROR;
 
+	struct thread *child = get_child_by_id(id);
 	if (child == NULL) return TID_ERROR;
 
 	
@@ -103,6 +103,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	// wait
 	sema_down(&child->sema_fork);
 	if (child->exit_status == -1) return TID_ERROR;
+
 
 	return id;
 
@@ -140,6 +141,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
 		return false;
 	}
 	return true;
@@ -175,7 +177,9 @@ __do_fork (void *aux) {
 		goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+	{
 		goto error;
+	}
 #endif
 
 	/* TODO: Your code goes here.
@@ -184,13 +188,20 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+
 	
-	
-	for (int i = 2; i < 131 ; i++)
+	for (int i = 0; i < FILE_LIMIT ; i++)
 	{
 		if (parent->file_table[i] != NULL)
 		{
-			current->file_table[i] = file_duplicate(parent->file_table[i]);
+			struct file *dup_file = file_duplicate(parent->file_table[i]);
+			if (dup_file == NULL) goto error;
+			current->file_table[i] = dup_file;
+			
+		}
+		else 
+		{
+			current->file_table[i] = NULL;
 		}
 	}
 
@@ -207,7 +218,6 @@ error:
 	current->exit_status = -1;
 	sema_up(&current->sema_fork);
 	thread_exit();
-
 }
 
 /* Switch the current execution context to the f_name.
@@ -289,7 +299,6 @@ process_wait (tid_t child_tid UNUSED) {
 	child->wait_complete = true;
 
 	sema_down(&child->exit_wait_sema);
-	
 	int exit_status = child->exit_status;
 	list_remove(&child->child);
 	sema_up(&child->eliminated);
@@ -308,10 +317,13 @@ process_exit (void) {
 
 	file_close(curr->executable);
 	
-	for (int i = 2; i < 131; i++)
+	for (int i = 0; i < FILE_LIMIT; i++)
 	{
-		file_close(curr->file_table[i]);
-		curr->file_table[i] = NULL;
+		if (curr->file_table[i] != NULL)
+		{
+			file_close(curr->file_table[i]);
+			curr->file_table[i] = NULL;
+		}	
 	}
 
 	palloc_free_page(curr->file_table);
@@ -322,8 +334,8 @@ process_exit (void) {
 	while(curr_elem != last_elem)
 	{
 		struct thread *child = list_entry(curr_elem, struct thread, child);
-		process_wait(child->tid);
 		curr_elem = list_next(curr_elem);
+		process_wait(child->tid);
 	}
 
 	

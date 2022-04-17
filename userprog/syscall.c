@@ -77,7 +77,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			char *fn_copy = palloc_get_page(PAL_ZERO);
 			if (fn_copy == NULL) exit(-1);
-			memcpy(fn_copy, f->R.rdi, strlen(f->R.rdi) + 1);
+			strlcpy(fn_copy, f->R.rdi, PGSIZE);
 			
 			if (process_exec(fn_copy) == -1) exit(-1);
 
@@ -111,31 +111,28 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{		
 			struct thread *cur = thread_current();
 			is_valid_access(f->R.rdi);	
-			struct file *file_open = filesys_open(f->R.rdi);
+			struct file *file_o = filesys_open(f->R.rdi);
 		
-			int fd;
 				
-			if (file_open != NULL)
+			if (file_o != NULL)
 			{
 				
-				for (int i = 2; i < 131; i++)
+				for (int i = 2; i < FILE_LIMIT; i++)
 				{
 					if (cur->file_table[i] == NULL) 
 					{
-						cur->file_table[i]= file_open;
+						cur->file_table[i]= file_o;
 						f->R.rax = i;
 						break;
 					}
 					//file table is full, so close the given file
-					if (i == 130 && cur->file_table[130] != NULL) 
+					if (i == FILE_LIMIT - 1 && cur->file_table[FILE_LIMIT -1] != NULL) 
 					{
-						file_close(file_open);
+						file_close(file_o);
 						
 						f->R.rax = -1;
 					}
-				}
-				
-				
+				}	
 			}
 			else
 			{
@@ -170,7 +167,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			is_valid_access(buffer);
 			struct thread *cur = thread_current();
 
-			if (0 <= fd  && fd <131)
+			if (0 <= fd  && fd < FILE_LIMIT)
 			{
 				struct file *f_read = cur->file_table[fd];
 				
@@ -218,7 +215,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			struct thread *cur = thread_current();
 
-			if (0<=fd && fd<131)
+			if (0<=fd && fd<FILE_LIMIT)
 			{
 				struct file *f_write = cur->file_table[fd];
 				
@@ -287,7 +284,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			if (1<fd && fd < 131)
+			if (1<fd && fd < FILE_LIMIT)
 			{
 				
 				struct file *f_close = cur->file_table[fd];
