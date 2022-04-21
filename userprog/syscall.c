@@ -110,27 +110,56 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct thread *cur = thread_current();
 			is_valid_access(f->R.rdi);	
 			struct file *file_o = filesys_open(f->R.rdi);
-		
 				
 			if (file_o != NULL)
 			{
-				
-				for (int i = 2; i < FILE_LIMIT; i++)
+				struct file_table_entry *e = malloc(sizeof(struct file_table_entry));
+				if (e==NULL) 
 				{
-					if (cur->file_table[i] == NULL) 
+					f->R.rax = -1;
+					file_close(file_o);
+				}
+				else
+				{
+					e->file = file_o;
+					int find_fd = 2; 
+					struct list_elem *curr_elem= list_begin(&cur->file_table);
+					struct list_elem *last_elem = list_end(&cur->file_table);
+
+					if (curr_elem == last_elem)
 					{
-						cur->file_table[i]= file_o;
-						f->R.rax = i;
-						break;
+						e->fd = find_fd;
+						list_push_front(&cur->file_table, &e->elem);
+						f->R.rax = 2;
 					}
-					//file table is full, so close the given file
-					if (i == FILE_LIMIT - 1 && cur->file_table[i] != NULL) 
+					else
 					{
-						file_close(file_o);
-						
-						f->R.rax = -1;
-					}
+						while (curr_elem != last_elem)
+						{
+							struct file_table_entry *traverse = list_entry(curr_elem, struct file_table_entry, elem);
+							if (traverse->fd == find_fd) 
+							{
+								find_fd++;
+								if (list_next(curr_elem) == last_elem)
+								{
+									e->fd = find_fd;
+									list_push_back(&cur->file_table, &e->elem);
+									f->R.rax = e->fd;
+									break;
+								}
+							}	
+							else
+							{
+								e->fd = find_fd;
+								list_insert(&traverse->elem, &e->elem);
+								f->R.rax = e->fd;
+								break;
+							}
+							curr_elem = list_next(curr_elem);
+						}
+					}	
 				}	
+
 			}
 			else
 			{
@@ -144,7 +173,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			struct file *f_size = cur->file_table[fd];
+			struct file *f_size = NULL;
+
+			struct list_elem *curr = list_begin(&cur->file_table);
+			struct list_elem *last = list_end(&cur->file_table);
+			
+			while(curr != last)
+			{
+				struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+				if (e->fd == fd) f_size = e->file;
+				curr = list_next(curr);
+			}
 			
 			if (f_size != NULL)
 			{
@@ -163,11 +202,26 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			void *buffer = f->R.rsi;
 			unsigned size = f->R.rdx;
 			is_valid_access(buffer);
-			struct thread *cur = thread_current();
 
-			if (0 <= fd  && fd < FILE_LIMIT)
+			struct thread *cur = thread_current();
+			struct file *f_read = NULL;
+
+			if (0 <= fd)
 			{
-				struct file *f_read = cur->file_table[fd];
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					if (e->fd == fd) 
+					{
+						f_read = e->file;
+						break;
+					}
+					curr = list_next(curr);
+				}
+
 				int read_byte = 0;
 
 				if (fd == 0)
@@ -179,7 +233,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 						else read_byte++;
 					}
 					lock_release(&file_lock);
-					
 				}
 				else if (fd == 1)
 				{
@@ -207,12 +260,22 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			void *buffer = f->R.rsi;
 			unsigned size = f->R.rdx;
 			is_valid_access(buffer);
+			struct file *f_write = NULL;
 
 			struct thread *cur = thread_current();
 
-			if (0<=fd && fd<FILE_LIMIT)
+			if (0<=fd )
 			{
-				struct file *f_write = cur->file_table[fd];
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					if (e->fd == fd) f_write = e->file;
+					curr = list_next(curr);
+				}
+
 				int write_byte = 0;
 
 				if (fd == 0) write_byte = -1;
@@ -246,10 +309,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			unsigned new_pos = f->R.rsi;
 			struct thread *cur = thread_current();
+			struct file *f_seek = NULL;
 			
-			if (0 <= fd && fd <= FILE_LIMIT)
+			if (0 <= fd )
 			{
-				struct file *f_seek = cur->file_table[fd];
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					if (e->fd == fd) f_seek = e->file;
+					curr = list_next(curr);
+				}
+
 				if (f != NULL)
 				{
 					file_seek(f_seek, new_pos);
@@ -261,10 +334,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
+			struct file *f_tell = NULL;
 
-			if (0 <= fd && fd <= FILE_LIMIT)
+			if (0 <= fd)
 			{
-				struct file *f_tell = cur->file_table[fd];
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					if (e->fd == fd) f_tell = e->file;
+					curr = list_next(curr);
+				}
+
 				if (f != NULL)
 				{
 					f->R.rax = file_tell(f_tell);
@@ -277,10 +360,26 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			if (1<fd && fd < FILE_LIMIT)
+			struct file *f_close = NULL;
+
+			if (1<fd)
 			{
-				file_close(cur->file_table[fd]);
-				cur->file_table[fd] = NULL;
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					if (e->fd == fd) 
+					{
+						f_close = e->file;
+						file_close(f_close);
+						list_remove(&e->elem);
+						free(e);
+						break;
+					}	
+					curr = list_next(curr);
+				}
 			}
 			
 			break;
@@ -310,3 +409,4 @@ void exit(int status)
 	thread_exit();
 	
 }
+

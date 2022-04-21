@@ -30,7 +30,6 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63	   /* Highest priority. */
 
-#define FILE_LIMIT (1<<9)
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -96,6 +95,12 @@ struct donation
 	struct list_elem elem;
 };
 
+struct file_table_entry
+{
+	struct file *file;
+	int fd;
+	struct list_elem elem;
+};
 
 struct thread
 {
@@ -148,7 +153,7 @@ struct thread
 	bool wait_complete;	//need to be initialized "false"
 	
 	// for file syscall
-	struct file **file_table;
+	struct list file_table;
 
 	/* Owned by thread.c. */
 	struct intr_frame tf; /* Information for switching */
@@ -185,6 +190,7 @@ void thread_wakeup(int64_t ticks);
 int thread_get_priority(void);
 void thread_set_priority(int);
 bool thread_cmp_pri(const struct list_elem *, const struct list_elem*, void *);
+bool compare_fd(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 int thread_get_nice(void);
 void thread_set_nice(int);

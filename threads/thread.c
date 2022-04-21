@@ -210,9 +210,6 @@ thread_create(const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	//project2
-	t->file_table = palloc_get_page(PAL_ZERO);
-	if (t->file_table == NULL) return TID_ERROR;
 	
 	list_push_front(&current->children, &t->child);
 
@@ -645,6 +642,9 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	//executing file 
 	t->executable = NULL;
 
+	//init file table
+	list_init(&t->file_table);
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -859,4 +859,12 @@ struct thread *get_child_by_id(tid_t id)
 	
 	return NULL;
 
+}
+
+bool compare_fd(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct file_table_entry *fileA = list_entry(a, struct file_table_entry, elem);
+	struct file_table_entry *fileB = list_entry(b, struct file_table_entry, elem);
+	if (fileA->fd < fileB->fd) return true;
+	else return false;
 }

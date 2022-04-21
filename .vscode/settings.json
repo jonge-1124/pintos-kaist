@@ -10,6 +10,9 @@
         "file.h": "c",
         "filesys.h": "c",
         "synch.h": "c",
-        "off_t.h": "c"
+        "off_t.h": "c",
+        "*.tcc": "c",
+        "cstdlib": "c",
+        "memory": "c"
     }
 }

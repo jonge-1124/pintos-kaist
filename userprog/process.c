@@ -186,15 +186,23 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	
-	for (int i = 2; i < FILE_LIMIT ; i++)
+	struct list_elem *curr = list_begin(&parent->file_table);
+	struct list_elem *last = list_end(&parent->file_table);
+
+	while (curr != last)
 	{
-		if (parent->file_table[i] != NULL)
-		{
-			struct file *dup_file = file_duplicate(parent->file_table[i]);
-			if (dup_file == NULL) goto error;
-			current->file_table[i] = dup_file;
-			
-		}
+		struct file_table_entry *e_parent = list_entry(curr, struct file_table_entry, elem);
+		struct file_table_entry *e_child = malloc(sizeof(struct file_table_entry));
+		if (e_child == NULL) goto error;
+
+		e_child->fd = e_parent->fd;
+		e_child->file = file_duplicate(e_parent->file);
+		if (e_child->file == NULL) goto error;
+
+		list_push_back(&current->file_table, &e_child->elem);
+
+		curr = list_next(curr);
+
 	}
 
 	process_init ();
@@ -304,19 +312,20 @@ process_exit (void) {
 
 	file_close(curr->executable);
 	
-	for (int i = 0; i < FILE_LIMIT; i++)
+	struct list_elem *curr_elem = list_begin(&curr->file_table);
+	struct list_elem *last_elem = list_end(&curr->file_table);
+			
+	while(curr_elem != last_elem)
 	{
-		if (curr->file_table[i] != NULL)
-		{
-			file_close(curr->file_table[i]);
-			curr->file_table[i] = NULL;
-		}	
+		struct file_table_entry *e = list_entry(curr_elem, struct file_table_entry, elem);
+		curr_elem = list_next(curr_elem);
+		list_remove(&e->elem);
+		file_close(e->file);
+		free(e);
 	}
-
-	palloc_free_page(curr->file_table);
 	
-	struct list_elem *curr_elem = list_begin(&curr->children);
-	struct list_elem *last_elem = list_end(&curr->children);
+	curr_elem = list_begin(&curr->children);
+	last_elem = list_end(&curr->children);
 
 	while(curr_elem != last_elem)
 	{
