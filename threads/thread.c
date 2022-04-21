@@ -639,8 +639,6 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	sema_init(&t->eliminated, 0);
 	t->wait_complete = false;
 
-	
-
 	//fork
 	sema_init(&t->sema_fork,0);
 
@@ -845,7 +843,7 @@ struct thread *get_child_by_id(tid_t id)
 {
 	struct thread *curr = thread_current();
 	
-	// check ready_list
+	// check children list
 	struct list_elem *curr_elem = list_begin(&curr->children);
 	struct list_elem *last_elem = list_end(&curr->children);
 

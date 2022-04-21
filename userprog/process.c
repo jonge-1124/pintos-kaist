@@ -98,8 +98,6 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	struct thread *child = get_child_by_id(id);
 	if (child == NULL) return TID_ERROR;
 
-	
-	
 	// wait
 	sema_down(&child->sema_fork);
 	if (child->exit_status == -1) return TID_ERROR;
@@ -187,10 +185,8 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-
-
 	
-	for (int i = 0; i < FILE_LIMIT ; i++)
+	for (int i = 2; i < FILE_LIMIT ; i++)
 	{
 		if (parent->file_table[i] != NULL)
 		{
@@ -199,16 +195,11 @@ __do_fork (void *aux) {
 			current->file_table[i] = dup_file;
 			
 		}
-		else 
-		{
-			current->file_table[i] = NULL;
-		}
 	}
 
+	process_init ();
 	// signal finish duplicating resource
 	sema_up(&current->sema_fork);
-
-	process_init ();
 
 	/* Finally, switch to the newly created process. */
 	
@@ -225,7 +216,6 @@ error:
 int 
  process_exec(void *f_name) {
 	char *file_name = f_name;
-
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
@@ -240,14 +230,11 @@ int
 	/* We first kill the current context */
 	process_cleanup ();
 	
-
-	
 	/* And then load the binary */
 	
 	success = load(file_name, &_if);
 	palloc_free_page (file_name);
 
-	
 	/* If load failed, quit. */
 	
 	if (!success)
@@ -278,7 +265,7 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       implementing the process_wait. */
 	struct thread *cur = thread_current();
 
-	struct thread *child;
+	struct thread *child = NULL;
 
 	struct list_elem *cur_elem = list_begin(&cur->children);
 	struct list_elem *last_elem = list_end(&cur->children);
@@ -294,8 +281,8 @@ process_wait (tid_t child_tid UNUSED) {
 		cur_elem = list_next(cur_elem);
 	}
 
-	if (cur_elem == last_elem) return -1;	// not found
-	if (child->wait_complete) return -1;	//wait already implemented
+	if (child == NULL) return -1;	// not found
+	if (child->wait_complete) return -1;	//wait already called before 
 	child->wait_complete = true;
 
 	sema_down(&child->exit_wait_sema);
@@ -460,7 +447,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *fn_copy = palloc_get_page(0);
 	if (fn_copy == NULL) return false;
 	
-
 	memcpy(fn_copy, file_name, strlen(file_name) + 1);
 
 	int argc = 0 ;

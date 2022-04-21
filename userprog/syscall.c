@@ -77,7 +77,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			char *fn_copy = palloc_get_page(PAL_ZERO);
 			if (fn_copy == NULL) exit(-1);
-			strlcpy(fn_copy, f->R.rdi, PGSIZE);
+			strlcpy(fn_copy, f->R.rdi, strlen(f->R.rdi)+1);
 			
 			if (process_exec(fn_copy) == -1) exit(-1);
 
@@ -94,16 +94,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CREATE : 
 		{	
 			is_valid_access(f->R.rdi);
-			if ( filesys_create(f->R.rdi, f->R.rsi)) f->R.rax = true;
-			else f->R.rax = false;
+			f->R.rax = filesys_create(f->R.rdi, f->R.rsi); 
 			break;
 		}
 
 		case SYS_REMOVE :
 		{	
 			is_valid_access(f->R.rdi);
-			if (filesys_remove(f->R.rdi)) f->R.rax = true;
-			else f->R.rax = false;
+			f->R.rax = filesys_remove(f->R.rdi);
 			break;
 		}
 
@@ -126,7 +124,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 						break;
 					}
 					//file table is full, so close the given file
-					if (i == FILE_LIMIT - 1 && cur->file_table[FILE_LIMIT -1] != NULL) 
+					if (i == FILE_LIMIT - 1 && cur->file_table[i] != NULL) 
 					{
 						file_close(file_o);
 						
@@ -170,10 +168,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			if (0 <= fd  && fd < FILE_LIMIT)
 			{
 				struct file *f_read = cur->file_table[fd];
-				
 				int read_byte = 0;
-
-				
 
 				if (fd == 0)
 				{
@@ -218,10 +213,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			if (0<=fd && fd<FILE_LIMIT)
 			{
 				struct file *f_write = cur->file_table[fd];
-				
 				int write_byte = 0;
 
-				
 				if (fd == 0) write_byte = -1;
 				else if (fd == 1) 
 				{		
@@ -253,30 +246,30 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			unsigned new_pos = f->R.rsi;
 			struct thread *cur = thread_current();
-			struct file *f_seek = cur->file_table[fd];
 			
-
-			if (f != NULL)
+			if (0 <= fd && fd <= FILE_LIMIT)
 			{
-				file_seek(f_seek, new_pos);
-				
+				struct file *f_seek = cur->file_table[fd];
+				if (f != NULL)
+				{
+					file_seek(f_seek, new_pos);
+				}
 			}
-
 			break;
 		}
 		case SYS_TELL :
 		{
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			struct file *f_tell = cur->file_table[fd];
-			unsigned pos;
 
-			if (f != NULL)
+			if (0 <= fd && fd <= FILE_LIMIT)
 			{
-				pos = file_tell(f_tell);
-				f->R.rax = pos;
+				struct file *f_tell = cur->file_table[fd];
+				if (f != NULL)
+				{
+					f->R.rax = file_tell(f_tell);
+				}
 			}
-			
 			break;
 		}
 		case SYS_CLOSE :
@@ -286,11 +279,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct thread *cur = thread_current();
 			if (1<fd && fd < FILE_LIMIT)
 			{
-				
-				struct file *f_close = cur->file_table[fd];
-				file_close(f_close);
+				file_close(cur->file_table[fd]);
 				cur->file_table[fd] = NULL;
-				
 			}
 			
 			break;

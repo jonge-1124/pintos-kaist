@@ -142,9 +142,9 @@ struct thread
 	
 	struct list_elem child;
 	struct list children;
-	struct semaphore eliminated;
 	
 	struct semaphore exit_wait_sema;	
+	struct semaphore eliminated;
 	bool wait_complete;	//need to be initialized "false"
 	
 	// for file syscall
