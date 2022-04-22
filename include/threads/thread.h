@@ -95,7 +95,7 @@ struct donation
 	struct list_elem elem;
 };
 
-struct file_table_entry
+struct file_table_entity
 {
 	struct file *file;
 	int fd;

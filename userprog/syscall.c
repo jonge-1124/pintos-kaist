@@ -113,7 +113,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				
 			if (file_o != NULL)
 			{
-				struct file_table_entry *e = malloc(sizeof(struct file_table_entry));
+				struct file_table_entity *e = malloc(sizeof(struct file_table_entity));
 				if (e==NULL) 
 				{
 					f->R.rax = -1;
@@ -136,7 +136,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					{
 						while (curr_elem != last_elem)
 						{
-							struct file_table_entry *traverse = list_entry(curr_elem, struct file_table_entry, elem);
+							struct file_table_entity *traverse = list_entry(curr_elem, struct file_table_entity, elem);
 							if (traverse->fd == find_fd) 
 							{
 								find_fd++;
@@ -180,7 +180,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			while(curr != last)
 			{
-				struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+				struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 				if (e->fd == fd) f_size = e->file;
 				curr = list_next(curr);
 			}
@@ -213,7 +213,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 				while(curr != last)
 				{
-					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) 
 					{
 						f_read = e->file;
@@ -271,7 +271,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 				while(curr != last)
 				{
-					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) f_write = e->file;
 					curr = list_next(curr);
 				}
@@ -318,7 +318,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 				while(curr != last)
 				{
-					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) f_seek = e->file;
 					curr = list_next(curr);
 				}
@@ -343,7 +343,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 				while(curr != last)
 				{
-					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) f_tell = e->file;
 					curr = list_next(curr);
 				}
@@ -369,7 +369,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 				while(curr != last)
 				{
-					struct file_table_entry *e = list_entry(curr, struct file_table_entry, elem);
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) 
 					{
 						f_close = e->file;

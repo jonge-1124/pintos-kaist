@@ -863,8 +863,8 @@ struct thread *get_child_by_id(tid_t id)
 
 bool compare_fd(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
-	struct file_table_entry *fileA = list_entry(a, struct file_table_entry, elem);
-	struct file_table_entry *fileB = list_entry(b, struct file_table_entry, elem);
+	struct file_table_entity *fileA = list_entry(a, struct file_table_entity, elem);
+	struct file_table_entity *fileB = list_entry(b, struct file_table_entity, elem);
 	if (fileA->fd < fileB->fd) return true;
 	else return false;
 }

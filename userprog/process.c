@@ -191,8 +191,8 @@ __do_fork (void *aux) {
 
 	while (curr != last)
 	{
-		struct file_table_entry *e_parent = list_entry(curr, struct file_table_entry, elem);
-		struct file_table_entry *e_child = malloc(sizeof(struct file_table_entry));
+		struct file_table_entity *e_parent = list_entry(curr, struct file_table_entity, elem);
+		struct file_table_entity *e_child = malloc(sizeof(struct file_table_entity));
 		if (e_child == NULL) goto error;
 
 		e_child->fd = e_parent->fd;
@@ -317,7 +317,7 @@ process_exit (void) {
 			
 	while(curr_elem != last_elem)
 	{
-		struct file_table_entry *e = list_entry(curr_elem, struct file_table_entry, elem);
+		struct file_table_entity *e = list_entry(curr_elem, struct file_table_entity, elem);
 		curr_elem = list_next(curr_elem);
 		list_remove(&e->elem);
 		file_close(e->file);
