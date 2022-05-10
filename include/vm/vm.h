@@ -2,6 +2,8 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include <list.h>
+#include "hash.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -57,13 +59,27 @@ struct page {
 		struct page_cache page_cache;
 #endif
 	};
+	
+	bool writable;
+	struct hash_elem hash_elem;
 };
 
 /* The representation of "frame" */
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem elem;
 };
+
+struct frame_table{
+	struct list frame_list;
+	struct list_elem *needle;
+};
+
+
+unsigned page_hash(const struct hash_elem *p, void *aux UNUSED);
+bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
+
 
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
@@ -85,6 +101,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct hash spt_table;
 };
 
 #include "threads/thread.h"

@@ -3,6 +3,10 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/mmu.h"
+
+// frame table implemented by doubly linked list
+struct frame_table frame_table;
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -16,6 +20,8 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&(frame_table.frame_list));
+	frame_table.needle =list_tail(&frame_table.frame_list);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -55,6 +61,16 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: should modify the field after calling the uninit_new. */
 
 		/* TODO: Insert the page into the spt. */
+
+		struct page *new_page = malloc(sizeof(struct page));
+		void *initializer;
+		if (VM_TYPE(type) == VM_ANON) initializer = anon_initializer;
+		if (VM_TYPE(type) == VM_FILE) initializer = file_backed_initializer;
+
+		uninit_new(new_page, upage, init, type, aux, initializer);
+
+		return true;
+
 	}
 err:
 	return false;
@@ -65,7 +81,11 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
+	void *page_addr = pg_round_down(va);
+	struct page temp;
+	temp.va = page_addr;
 
+	page = hash_find(&thread_current()->spt, &temp.hash_elem);
 	return page;
 }
 
@@ -75,21 +95,50 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
-
+	if (hash_insert(&(thread_current()->spt.spt_table), &page->hash_elem) == NULL) succ = true;
 	return succ;
 }
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
+	hash_delete(&(thread_current()->spt.spt_table), &page->hash_elem);
 	vm_dealloc_page (page);
 	return true;
 }
+
 
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
+	struct list_elem *needle = frame_table.needle;
+	struct list *frame_list = &(frame_table.frame_list);
+
+	struct list_elem *curr = needle;
+	while(true)
+	{
+		struct frame *f = list_entry(curr, struct frame, elem);
+		if (pml4_is_accessed(thread_current()->pml4,f->page->va))
+		{
+			pml4_set_accessed(thread_current()->pml4, f->page->va, false);
+			if(list_next(curr) == list_tail(frame_list))
+			{
+				curr = list_begin(frame_list);
+			}
+			else
+			{
+				curr = list_next(curr);
+			}
+		}
+		else
+		{
+			pml4_set_accessed(thread_current()->pml4, f->page->va, true);
+			needle = curr;
+			break;
+		}
+	}
+	victim = list_entry(needle, struct frame, elem);
 
 	return victim;
 }
@@ -101,7 +150,11 @@ vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 
-	return NULL;
+
+	pml4_clear_page(&thread_current()->pml4, victim->page);
+	victim->page = NULL;
+
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -110,9 +163,19 @@ vm_evict_frame (void) {
  * space.*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
+	struct frame *frame = malloc(sizeof(struct frame));
 	/* TODO: Fill this function. */
-
+	frame->kva = palloc_get_page(PAL_USER);
+	frame->page = NULL;
+	if (frame->kva == NULL) 
+	{
+		free(frame);
+		frame = vm_evict_frame();
+	} 
+	else	// allocation success, need to push frame to frame table
+	{
+		list_insert(frame_table.needle, &frame->elem);
+	}
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 	return frame;
@@ -133,9 +196,21 @@ bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	struct page *page = NULL;
+	struct page *page = spt_find_page(spt, addr);
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+	bool valid = true;
+
+	if (page == NULL) valid = false;
+	if (user && is_kernel_vaddr(page->va)) valid = false;
+	if (write && !page->writable) valid = false;
+
+	if (!valid)
+	{
+		// process exit & resource free
+		supplemental_page_table_kill(spt);
+		thread_exit();
+	}
 
 	return vm_do_claim_page (page);
 }
@@ -167,6 +242,7 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	pml4_set_page(thread_current()->pml4, page, frame->kva, page->writable);
 
 	return swap_in (page, frame->kva);
 }
@@ -187,4 +263,19 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+}
+
+
+unsigned page_hash(const struct hash_elem *p, void *aux UNUSED)
+{
+	const struct page *page = hash_entry (p, struct page, hash_elem);
+  	return hash_bytes (&page->va, sizeof page->va);
+}
+
+bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED)
+{
+	const struct page *pa = hash_entry (a, struct page, hash_elem);
+  	const struct page *pb = hash_entry (b, struct page, hash_elem);
+
+  	return pa->va < pb->va;
 }

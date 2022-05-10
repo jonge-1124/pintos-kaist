@@ -13,6 +13,9 @@
         "off_t.h": "c",
         "*.tcc": "c",
         "cstdlib": "c",
-        "memory": "c"
+        "memory": "c",
+        "malloc.h": "c",
+        "hash.h": "c",
+        "process.h": "c"
     }
 }
