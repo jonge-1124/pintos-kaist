@@ -8,6 +8,7 @@
 // frame table implemented by doubly linked list
 struct frame_table frame_table;
 
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -68,6 +69,10 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		if (VM_TYPE(type) == VM_FILE) initializer = file_backed_initializer;
 
 		uninit_new(new_page, upage, init, type, aux, initializer);
+		new_page->writable = writable;
+		new_page->type = type;
+
+		spt_insert_page(spt, new_page);
 
 		return true;
 
@@ -152,6 +157,7 @@ vm_evict_frame (void) {
 
 
 	pml4_clear_page(&thread_current()->pml4, victim->page);
+	victim->page->frame = NULL;
 	victim->page = NULL;
 
 	return victim;
@@ -174,6 +180,7 @@ vm_get_frame (void) {
 	} 
 	else	// allocation success, need to push frame to frame table
 	{
+		frame->ref_cnt = 1;
 		list_insert(frame_table.needle, &frame->elem);
 	}
 	ASSERT (frame != NULL);
@@ -250,12 +257,60 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	hash_init(&(spt->spt_table), page_hash, page_less, NULL);
 }
 
+
+bool claim_page(struct page *child_page, void *aux)
+{
+	struct page *parent_page = aux;
+	struct hash_elem elem = child_page->hash_elem;
+
+	memcopy(child_page, parent_page, sizeof(struct page));
+
+	child_page->hash_elem = elem;
+
+	parent_page->frame->ref_cnt++;
+}
+
+
 /* Copy supplemental page table from src to dst */
+void alloc_page(struct hash_elem *e, void *aux)
+{
+	struct supplemental_page_table *dst = aux;
+
+	struct page *parent_page = hash_entry(e, struct page, hash_elem);
+	struct page *child_page = malloc(sizeof(struct page));
+
+	// copy contents
+	
+	
+	void *initializer;
+	if (VM_TYPE(parent_page->type) == VM_ANON) initializer = anon_initializer;
+	if (VM_TYPE(parent_page->type) == VM_FILE) initializer = file_backed_initializer;
+
+	uninit_new(child_page, parent_page->va, claim_page ,parent_page->type, parent_page ,initializer);
+
+	// insert
+	hash_insert(&dst->spt_table, &child_page->hash_elem);
+
+}
+
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+	src->spt_table.aux = dst;
+	hash_apply(&src->spt_table, alloc_page);
+}
+
+
+void delete_hash_destroy_page(struct hash_elem *e, void *aux)
+{
+	struct supplemental_page_table *spt = thread_current()->spt;
+	struct page *page = hash_entry(e, struct page, hash_elem);
+
+	hash_delete(&spt->spt_table, e);
+	destroy(page);
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -263,6 +318,9 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+
+	hash_apply(&spt->spt_table, delete_hash_destroy_page);
+
 }
 
 

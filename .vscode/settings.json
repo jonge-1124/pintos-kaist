@@ -16,6 +16,9 @@
         "memory": "c",
         "malloc.h": "c",
         "hash.h": "c",
-        "process.h": "c"
+        "process.h": "c",
+        "uninit.h": "c",
+        "disk.h": "c",
+        "bitmap.h": "c"
     }
 }

@@ -647,7 +647,7 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	list_init(&t->file_table);
 
 	//initialize spt
-	hash_init(&(t->spt.spt_table), page_hash, page_less, NULL);
+	supplemental_page_table_init(t->spt);
 
 }
 

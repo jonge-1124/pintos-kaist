@@ -4,6 +4,7 @@
 #include "threads/palloc.h"
 #include <list.h>
 #include "hash.h"
+#include "bitmap.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -61,12 +62,14 @@ struct page {
 	};
 	
 	bool writable;
+	enum vm_type type;
 	struct hash_elem hash_elem;
 };
 
 /* The representation of "frame" */
 struct frame {
 	void *kva;
+	int ref_cnt;
 	struct page *page;
 	struct list_elem elem;
 };
@@ -76,6 +79,10 @@ struct frame_table{
 	struct list_elem *needle;
 };
 
+// swap table
+struct swap_table{
+	struct bitmap *table;
+};
 
 unsigned page_hash(const struct hash_elem *p, void *aux UNUSED);
 bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
