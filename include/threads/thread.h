@@ -151,6 +151,7 @@ struct thread
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	uintptr_t save_rsp;
 #endif
 
 	

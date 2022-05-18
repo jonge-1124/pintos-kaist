@@ -6,7 +6,13 @@
 struct page;
 enum vm_type;
 
+
 struct file_page {
+	struct file *file;
+	size_t offset;
+	bool mmap;
+	bool munmap;
+	int page_num;
 };
 
 void vm_file_init (void);

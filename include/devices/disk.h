@@ -1,4 +1,4 @@
-#ifndef DEVICES_DISK_H
+r#ifndef DEVICES_DISK_H
 #define DEVICES_DISK_H
 
 #include <inttypes.h>

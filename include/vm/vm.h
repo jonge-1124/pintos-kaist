@@ -62,6 +62,7 @@ struct page {
 	};
 	
 	bool writable;
+	bool written;
 	enum vm_type type;
 	struct hash_elem hash_elem;
 };

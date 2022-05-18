@@ -29,6 +29,8 @@ static void page_fault (struct intr_frame *);
    Reference" for a description of each of these exceptions. */
 void
 exception_init (void) {
+	thread_current()->save_rsp = thread_current()->tf.rsp;
+
 	/* These exceptions can be raised explicitly by a user program,
 	   e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
 	   we set DPL==3, meaning that user programs are allowed to

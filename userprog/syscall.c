@@ -11,6 +11,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "vm/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -384,6 +385,45 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			
 			break;
 		}
+		case SYS_MMAP:
+		{
+			void *addr = f->R.rdi;
+			size_t length = f->R.rsi;
+			int writable = f->R.rdx;
+			int fd = f->R.r10;
+			off_t offset = f->R.r8;
+
+			struct file *file = NULL;
+
+			if (1<fd)
+			{
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
+					if (e->fd == fd) 
+					{
+						file = e->file;
+						break;
+					}	
+					curr = list_next(curr);
+				}
+			}
+			if (file == NULL) f->R.rax = NULL;
+			else
+			{
+				struct file *reopen_file = file_reopen(file);
+				f->R.rax = do_mmap(addr, length, writable, reopen_file, offset);
+			}	
+		}
+		case SYS_MUNMAP : 
+		{
+			void *addr = f->R.rdi;
+			do_mummap(addr);
+
+		}	
 	}
 	
 }

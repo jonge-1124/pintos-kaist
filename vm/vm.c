@@ -70,7 +70,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 		uninit_new(new_page, upage, init, type, aux, initializer);
 		new_page->writable = writable;
-		new_page->type = type;
+		new_page->type = VM_UNINIT;
 
 		spt_insert_page(spt, new_page);
 
@@ -155,7 +155,7 @@ vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 
-
+	if (pml4_is_dirty(&thread_current()->pml4, victim->page->va)) victim->page->written = true;
 	pml4_clear_page(&thread_current()->pml4, victim->page);
 	victim->page->frame = NULL;
 	victim->page = NULL;
@@ -191,6 +191,8 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	void *page = pg_round_down(addr);
+	vm_alloc_page_with_initializer(VM_ANON, page, true, NULL, NULL);
 }
 
 /* Handle the fault on write_protected page */
@@ -207,8 +209,17 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	bool valid = true;
+	void *user_rsp = thread_current()->save_rsp;
 
-	if (page == NULL) valid = false;
+	if (page == NULL) 
+	{
+		if (user_rsp < addr && addr < USER_STACK)
+		{
+			unsigned long check_max = addr;
+			if (USER_STACK - check_max < (1<<20)) vm_stack_growth(addr);
+		}
+		else valid = false;
+	}
 	if (user && is_kernel_vaddr(page->va)) valid = false;
 	if (write && !page->writable) valid = false;
 
@@ -218,7 +229,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		supplemental_page_table_kill(spt);
 		thread_exit();
 	}
-
+	
 	return vm_do_claim_page (page);
 }
 

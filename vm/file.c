@@ -1,6 +1,7 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "threads/vaddr.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -17,6 +18,7 @@ static const struct page_operations file_ops = {
 /* The initializer of file vm */
 void
 vm_file_init (void) {
+
 }
 
 /* Initialize the file backed page */
@@ -24,8 +26,17 @@ bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
 	page->operations = &file_ops;
+	struct mmap_info *aux = page->uninit.aux;
 
 	struct file_page *file_page = &page->file;
+	file_page->file = aux->file;
+	file_page->offset = aux->offset;
+	file_page->mmap = aux->mmap;
+	file_page->munmap = aux->munmap;
+	file_page->page_num = aux->page_num;
+
+	file_backed_swap_in(page, kva);
+	
 }
 
 /* Swap in the page by read contents from the file. */
@@ -44,15 +55,95 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+
+	file_backed_swap_out(page);
+	file_close(page->file.file);
+
+	int ref_cnt = page->frame->ref_cnt;
+	if (ref_cnt == 1 ) palloc_free_page(page->frame);
+	else page->frame->ref_cnt--;
+
 }
 
 /* Do the mmap */
+struct mmap_info
+{
+	struct file *file;
+	size_t offset;
+	bool mmap;
+	bool munmap;
+	int page_num;
+}
+
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
+	if (addr == NULL || length == 0 || pg_ofs(addr) != 0 || file ==file_length(file)==0) return NULL;
+
+	int page_num = (length%PGSIZE == 0)? length / PGSIZE : length/PGSIZE  + 1;
+
+	// check if there is an overlap, if so return NULL(fail)
+	for (int i = 0; i < page_num; i++)
+	{
+		if (spt_find_page(&thread_current()->spt, addr + i*PGSIZE) != NULL) return NULL;
+	}
+
+	for (int i = 0; i< page_num; i++)
+	{
+		vm_alloc_page_with_initializer(VM_FILE, addr + i*PGSIZE, writable, NULL, NULL);
+		struct page *p = spt_find_page(&thread_current()->spt, addr + i*PGSIZE);
+		
+		
+		if (i == 0) 
+		{
+			struct mmap_info *aux = malloc(sizeof(struct mmap_info));
+			aux->file = file;
+			aux->offset = offset;
+			aux->mmap = true;
+			aux->munmap = false;
+			aux->page_num = page_num;
+
+			p->uninit.aux = aux;
+			
+		}
+		else
+		{
+			struct mmap_info *aux = malloc(sizeof(struct mmap_info));
+			aux->file = file;
+			aux->offset = offset + i*PGSIZE;
+			aux->mmap = false;
+			aux->munmap = false;
+			aux->page_num = page_num;
+
+			p->uninit.aux = aux;
+		}
+		
+	}
+
+
+
 }
 
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+	struct page *p = spt_find_page(&thread_current()->spt, addr);
+	
+
+	if (p->file.mmap && !p->file.munmap)
+	{
+		int page_num = p->file.page_num;
+		for(int i= 0; i<page_num; i++)
+		{
+			p = spt_find_page(&thread_current()->spt, addr + i*PGSIZE);
+			
+			file_backed_swap_out(p);
+			
+			spt_remove_page(&thread_current()->spt, p);
+		}
+	}
+	else 
+	{
+		return;
+	}
 }
