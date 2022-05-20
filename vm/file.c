@@ -15,6 +15,15 @@ static const struct page_operations file_ops = {
 	.type = VM_FILE,
 };
 
+/* Do the mmap */
+struct mmap_info {
+	struct file *file;
+	size_t offset;
+	bool mmap;
+	bool munmap;
+	int page_num;
+};
+
 /* The initializer of file vm */
 void
 vm_file_init (void) {
@@ -43,12 +52,65 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+	int page_num = file_page->page_num;
+	int page_num_written = 0;
+
+	for (int i = 0; i<page_num; i++)
+	{
+		int read_byte = file_read_at(file_page->file, page->frame->kva, 4096, file_page->offset);
+		if (read_byte == PGSIZE)
+		{
+			page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
+			file_page = &page->file;
+		}
+		else
+		{
+			for (char *start = page->frame->kva + read_byte; start < page->frame->kva + PGSIZE; start++)
+			{
+				*start = 0;
+			}
+			page_num_written = i+1;
+
+			page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
+			file_page = &page->file;
+			break;
+		}
+	}
+
+	while (page_num_written < page_num)
+	{
+		for (char *start = page->frame->kva; start < page->frame->kva + PGSIZE; start++)
+		{
+			*start = 0;
+		}
+		page_num_written++;
+
+		page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
+		file_page = &page->file;
+
+	}
+
+	return true;
+
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	if (!page->written) return false;
+	else
+	{
+		int page_num = file_page->page_num;
+		for (int i = 0; i<page_num; i++)
+		{
+			file_write_at(file_page->file, page->frame->kva, PGSIZE, file_page->offset);
+			page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
+			file_page = &page->file;
+		}
+		page->written = false;
+		return true;
+	}
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
@@ -63,16 +125,6 @@ file_backed_destroy (struct page *page) {
 	if (ref_cnt == 1 ) palloc_free_page(page->frame);
 	else page->frame->ref_cnt--;
 
-}
-
-/* Do the mmap */
-struct mmap_info
-{
-	struct file *file;
-	size_t offset;
-	bool mmap;
-	bool munmap;
-	int page_num;
 }
 
 void *

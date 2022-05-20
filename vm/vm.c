@@ -156,7 +156,14 @@ vm_evict_frame (void) {
 	/* TODO: swap out the victim and return the evicted frame. */
 
 	if (pml4_is_dirty(&thread_current()->pml4, victim->page->va)) victim->page->written = true;
+
+	// eliminate entry from page table
 	pml4_clear_page(&thread_current()->pml4, victim->page);
+
+	// swap_out
+	swap_out(victim->page);
+
+	// unlink existed pair between page and frame
 	victim->page->frame = NULL;
 	victim->page = NULL;
 
@@ -277,7 +284,7 @@ bool claim_page(struct page *child_page, void *aux)
 	struct page *parent_page = aux;
 	struct hash_elem elem = child_page->hash_elem;
 
-	memcopy(child_page, parent_page, sizeof(struct page));
+	memcpy(child_page, parent_page, sizeof(struct page));
 
 	child_page->hash_elem = elem;
 
@@ -317,7 +324,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
 void delete_hash_destroy_page(struct hash_elem *e, void *aux)
 {
-	struct supplemental_page_table *spt = thread_current()->spt;
+	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *page = hash_entry(e, struct page, hash_elem);
 
 	hash_delete(&spt->spt_table, e);

@@ -85,8 +85,8 @@ struct swap_table{
 	struct bitmap *table;
 };
 
-unsigned page_hash(const struct hash_elem *p, void *aux UNUSED);
-bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
+unsigned page_hash(const struct hash_elem *p, void *aux );
+bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux );
 
 
 /* The function table for page operations.

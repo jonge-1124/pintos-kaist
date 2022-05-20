@@ -394,6 +394,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			off_t offset = f->R.r8;
 
 			struct file *file = NULL;
+			struct thread *cur = thread_current();
 
 			if (1<fd)
 			{
@@ -421,7 +422,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_MUNMAP : 
 		{
 			void *addr = f->R.rdi;
-			do_mummap(addr);
+			do_munmap(addr);
 
 		}	
 	}
