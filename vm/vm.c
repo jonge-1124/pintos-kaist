@@ -53,7 +53,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
 
-	struct supplemental_page_table *spt = &thread_current ()->spt;
+	struct supplemental_page_table *spt = &thread_current()->spt;
 
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
@@ -86,12 +86,18 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
-	void *page_addr = pg_round_down(va);
+	
 	struct page temp;
-	temp.va = page_addr;
+	temp.va = pg_round_down(va);
 
-	page = hash_find(&thread_current()->spt, &temp.hash_elem);
-	return page;
+	struct hash_elem *elem = hash_find(spt->spt_table, &(temp.hash_elem));
+	if (elem == NULL) return NULL;
+	else
+	{
+		page = hash_entry(elem, struct page, hash_elem);
+		return page;
+	}
+
 }
 
 /* Insert PAGE into spt with validation. */
@@ -100,13 +106,14 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
-	if (hash_insert(&(thread_current()->spt.spt_table), &page->hash_elem) == NULL) succ = true;
+	if (hash_insert(spt->spt_table, &page->hash_elem) == NULL) succ = true;
 	return succ;
+	
 }
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
-	hash_delete(&(thread_current()->spt.spt_table), &page->hash_elem);
+	hash_delete((thread_current()->spt.spt_table), &page->hash_elem);
 	vm_dealloc_page (page);
 	return true;
 }
@@ -275,7 +282,8 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
-	hash_init(&(spt->spt_table), page_hash, page_less, NULL);
+	spt->spt_table = malloc(sizeof(struct hash));
+	hash_init(spt->spt_table, page_hash, page_less, NULL);
 }
 
 
@@ -310,15 +318,15 @@ void alloc_page(struct hash_elem *e, void *aux)
 	uninit_new(child_page, parent_page->va, claim_page ,parent_page->type, parent_page ,initializer);
 
 	// insert
-	hash_insert(&dst->spt_table, &child_page->hash_elem);
+	hash_insert(dst->spt_table, &child_page->hash_elem);
 
 }
 
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	src->spt_table.aux = dst;
-	hash_apply(&src->spt_table, alloc_page);
+	(*src->spt_table).aux = dst;
+	hash_apply(src->spt_table, alloc_page);
 }
 
 
@@ -327,18 +335,25 @@ void delete_hash_destroy_page(struct hash_elem *e, void *aux)
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *page = hash_entry(e, struct page, hash_elem);
 
-	hash_delete(&spt->spt_table, e);
+	hash_delete(spt->spt_table, e);
 	destroy(page);
 }
 
+/* swap out a page in spt */
+void swap_out_spt(struct hash_elem *e, void *aux)
+{
+	struct supplemental_page_table *spt = &thread_current()->spt;
+	struct page *page = hash_entry(e, struct page, hash_elem);
+	swap_out(page);
+}
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-
-	hash_apply(&spt->spt_table, delete_hash_destroy_page);
-
+	hash_apply(spt->spt_table, swap_out_spt);
+	hash_apply(spt->spt_table, delete_hash_destroy_page);
+	free(spt->spt_table);
 }
 
 

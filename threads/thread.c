@@ -646,9 +646,6 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	//init file table
 	list_init(&t->file_table);
 
-	//initialize spt
-	supplemental_page_table_init(&t->spt);
-
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
