@@ -330,6 +330,7 @@ pic_end_of_interrupt (int irq) {
    interrupted thread's registers. */
 void
 intr_handler (struct intr_frame *frame) {
+	thread_current()->save_rsp = frame->rsp;
 	bool external;
 	intr_handler_func *handler;
 

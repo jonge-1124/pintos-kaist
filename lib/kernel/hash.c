@@ -53,12 +53,18 @@ hash_clear (struct hash *h, hash_action_func *destructor) {
 
 	for (i = 0; i < h->bucket_cnt; i++) {
 		struct list *bucket = &h->buckets[i];
+		
 
 		if (destructor != NULL)
 			while (!list_empty (bucket)) {
+				
 				struct list_elem *list_elem = list_pop_front (bucket);
+				
 				struct hash_elem *hash_elem = list_elem_to_hash_elem (list_elem);
-				destructor (hash_elem, h->aux);
+				
+				destructor(hash_elem, h->aux);
+
+				
 			}
 
 		list_init (bucket);
@@ -90,8 +96,8 @@ hash_destroy (struct hash *h, hash_action_func *destructor) {
    without inserting NEW. */
 struct hash_elem *
 hash_insert (struct hash *h, struct hash_elem *new) {
-	struct list *bucket = find_bucket (h, new);
-	struct hash_elem *old = find_elem (h, bucket, new);
+	struct list *bucket = find_bucket(h, new);
+	struct hash_elem *old = find_elem(h, bucket, new);
 
 	if (old == NULL)
 		insert_elem (h, bucket, new);
@@ -121,7 +127,7 @@ hash_replace (struct hash *h, struct hash_elem *new) {
    null pointer if no equal element exists in the table. */
 struct hash_elem *
 hash_find (struct hash *h, struct hash_elem *e) {
-	return find_elem (h, find_bucket (h, e), e);
+	return find_elem(h, find_bucket(h, e), e);
 }
 
 /* Finds, removes, and returns an element equal to E in hash
@@ -288,10 +294,12 @@ find_bucket (struct hash *h, struct hash_elem *e) {
 static struct hash_elem *
 find_elem (struct hash *h, struct list *bucket, struct hash_elem *e) {
 	struct list_elem *i;
-
+	
 	for (i = list_begin (bucket); i != list_end (bucket); i = list_next (i)) {
+		
 		struct hash_elem *hi = list_elem_to_hash_elem (i);
-		if (!h->less (hi, e, h->aux) && !h->less (e, hi, h->aux))
+		
+		if (!h->less(hi, e, h->aux) && !h->less(e, hi, h->aux))
 			return hi;
 	}
 	return NULL;

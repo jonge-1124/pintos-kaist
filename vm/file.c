@@ -35,6 +35,7 @@ bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
 	page->operations = &file_ops;
+	page->type = VM_FILE;
 	struct mmap_info *aux = page->uninit.aux;
 
 	struct file_page *file_page = &page->file;
@@ -45,6 +46,8 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page->page_num = aux->page_num;
 
 	file_backed_swap_in(page, kva);
+
+	return true;
 	
 }
 
@@ -122,7 +125,7 @@ file_backed_destroy (struct page *page) {
 	file_close(page->file.file);
 
 	int ref_cnt = page->frame->ref_cnt;
-	if (ref_cnt == 1 ) palloc_free_page(page->frame);
+	if (ref_cnt == 1 ) palloc_free_page(page->frame->kva);
 	else page->frame->ref_cnt--;
 
 }

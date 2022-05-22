@@ -60,11 +60,12 @@ struct page {
 		struct page_cache page_cache;
 #endif
 	};
-	
+	struct hash_elem hash_elem;
 	bool writable;
 	bool written;
 	enum vm_type type;
-	struct hash_elem hash_elem;
+	
+	
 };
 
 /* The representation of "frame" */
@@ -109,7 +110,9 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
-	struct hash *spt_table;
+	
+	struct hash spt_table;
+	
 };
 
 #include "threads/thread.h"
@@ -133,5 +136,10 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+
+unsigned page_hash(const struct hash_elem *, void *);
+bool page_less(const struct hash_elem *, const struct hash_elem *, void *);
+void swap_out_and_destroy(struct hash_elem *e, void *aux);
 
 #endif  /* VM_VM_H */

@@ -29,7 +29,7 @@ static void page_fault (struct intr_frame *);
    Reference" for a description of each of these exceptions. */
 void
 exception_init (void) {
-	thread_current()->save_rsp = thread_current()->tf.rsp;
+	
 
 	/* These exceptions can be raised explicitly by a user program,
 	   e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
@@ -147,6 +147,8 @@ page_fault (struct intr_frame *f) {
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
+
+	
 	if ((not_present) || (user && is_kernel_vaddr(fault_addr)) || (fault_addr == NULL))
 	{
 		struct thread *curr = thread_current();
@@ -154,7 +156,7 @@ page_fault (struct intr_frame *f) {
 		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 		thread_exit();
 	}
-
+	
 	/* Count page faults. */
 	page_fault_cnt++;
 

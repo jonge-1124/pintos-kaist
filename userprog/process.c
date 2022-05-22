@@ -73,11 +73,11 @@ process_create_initd (const char *file_name) {
 static void
 initd (void *f_name) {
 #ifdef VM
-	supplemental_page_table_init (&thread_current()->spt);
+	supplemental_page_table_init(&thread_current()->spt);
 #endif
-
+	
 	process_init ();
-
+	
 	if (process_exec (f_name) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
@@ -234,15 +234,16 @@ int
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
-
+	
 	/* We first kill the current context */
 	process_cleanup ();
 	
 	/* And then load the binary */
 	
 	success = load(file_name, &_if);
+	
 	palloc_free_page (file_name);
-
+	
 	/* If load failed, quit. */
 	
 	if (!success)
@@ -782,12 +783,14 @@ lazy_load_segment (struct page *page, void *aux) {
 	uint8_t *kpage = page->frame->kva;
 
 	if (file_read (file, kpage, read_bytes) != (int) read_bytes) {
-			palloc_free_page (kpage);
-			return false;
+			
+		free(aux);
+		return false;
 	}
 	memset (kpage + read_bytes, 0, zero_bytes);
 	free(aux);
-
+	
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -811,6 +814,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	
+
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -824,7 +829,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		aux->ofs = ofs;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;
-
+		
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux))
 			return false;
@@ -833,6 +838,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += page_read_bytes;
+		
 	}
 	return true;
 }
@@ -847,6 +854,14 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	if (vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL))
+	{
+		success = vm_claim_page(stack_bottom);
+		if(success) if_->rsp = USER_STACK;
+	}
+
+	struct page *p = spt_find_page(&thread_current()->spt, stack_bottom);
+	p->type = VM_MARKER_0; 
 
 	return success;
 }

@@ -35,20 +35,23 @@ bool
 anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
 	page->operations = &anon_ops;
+	page->type = VM_ANON;
 
 	struct anon_page *anon_page = &page->anon;
 	anon_page->saved_sector_start = 0;
 
 	// this function is called at first fault, so data is not swapped out
 	anon_page->is_swapped_out = false;
+	return true;
 }
 
 /* Swap in the page by read contents from the swap disk. */
 static bool
 anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
-
-	if (!anon_page->is_swapped_out) return false;
+	
+	
+	if (!anon_page->is_swapped_out) return true;
 	else
 	{
 		for (int i = 0; i < 8; i++)
@@ -96,7 +99,7 @@ anon_destroy (struct page *page) {
 	{
 		//data stored in frame, need to clear frame
 		int ref_cnt = page->frame->ref_cnt;
-		if (ref_cnt == 1 ) palloc_free_page(page->frame);
+		if (ref_cnt == 1 ) palloc_free_page(page->frame->kva);
 		else page->frame->ref_cnt--;
 	}
 }

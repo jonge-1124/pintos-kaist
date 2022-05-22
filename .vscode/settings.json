@@ -21,6 +21,9 @@
         "disk.h": "c",
         "bitmap.h": "c",
         "exception.h": "c",
-        "vm.h": "c"
+        "vm.h": "c",
+        "memory_resource": "c",
+        "algorithm": "c",
+        "*.inc": "c"
     }
 }
