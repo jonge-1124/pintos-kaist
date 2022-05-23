@@ -124,9 +124,10 @@ file_backed_destroy (struct page *page) {
 	file_backed_swap_out(page);
 	file_close(page->file.file);
 
-	int ref_cnt = page->frame->ref_cnt;
-	if (ref_cnt == 1 ) palloc_free_page(page->frame->kva);
-	else page->frame->ref_cnt--;
+	// int ref_cnt = page->frame->ref_cnt;
+	//if (ref_cnt == 1 ) 
+	palloc_free_page(page->frame->kva);
+	//else page->frame->ref_cnt--;
 
 }
 

@@ -436,7 +436,10 @@ void is_valid_access(void *va)
 	if (is_kernel_vaddr(va))  exit(-1);
 
 	void *page = pml4_get_page(thread_current()->pml4,va);
-	if (page==NULL) exit(-1);
+	if (page==NULL) 
+	{
+		if (spt_find_page(&thread_current()->spt, va) == NULL) exit(-1);
+	}
 
 	return;
 

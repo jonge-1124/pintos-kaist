@@ -193,7 +193,7 @@ vm_get_frame (void) {
 	} 
 	else	// allocation success, need to push frame to frame table
 	{
-		frame->ref_cnt = 1;
+		//frame->ref_cnt = 1;
 		list_insert(frame_table.needle, &frame->elem);
 	}
 	ASSERT (frame != NULL);
@@ -299,46 +299,44 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 }
 
 
-bool claim_page(struct page *child_page, void *aux)
-{
-	struct page *parent_page = aux;
-	struct hash_elem elem = child_page->hash_elem;
-
-	memcpy(child_page, parent_page, sizeof(struct page));
-
-	child_page->hash_elem = elem;
-
-	parent_page->frame->ref_cnt++;
-}
-
-
 /* Copy supplemental page table from src to dst */
-void alloc_page(struct hash_elem *e, void *aux)
+void copy_spt(struct hash_elem *e, void *aux)
 {
 	struct supplemental_page_table *dst = aux;
 
 	struct page *parent_page = hash_entry(e, struct page, hash_elem);
-	struct page *child_page = malloc(sizeof(struct page));
+	enum vm_type p_type = parent_page->operations->type;
+	bool wr = parent_page ->writable;
+	void *p_va = parent_page->va;
 
-	// copy contents
+	if (p_type == VM_UNINIT)
+	{
+		vm_initializer *init = parent_page->uninit.init;
+		void *aux = parent_page->uninit.aux;
+		vm_alloc_page_with_initializer(parent_page->uninit.type, p_va, wr, init, aux);
+	}
+	else
+	{
+		vm_alloc_page(p_type, p_va, wr);
+		struct page *child_page = spt_find_page(dst, p_va);
+		vm_do_claim_page(child_page);
+		
+
+		if (parent_page->type == VM_ANON) memcpy(&child_page->anon, &parent_page->anon, sizeof(struct anon_page));
+		if (parent_page->type == VM_FILE) memcpy(&child_page->file, &parent_page->file, sizeof(struct file_page));
+
+		
+		memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+	}
 	
 	
-	void *initializer;
-	if (VM_TYPE(parent_page->type) == VM_ANON) initializer = anon_initializer;
-	if (VM_TYPE(parent_page->type) == VM_FILE) initializer = file_backed_initializer;
-
-	uninit_new(child_page, parent_page->va, claim_page ,parent_page->type, parent_page ,initializer);
-
-	// insert
-	hash_insert(&dst->spt_table, &child_page->hash_elem);
-
 }
 
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	(src->spt_table).aux = dst;
-	hash_apply(&src->spt_table, alloc_page);
+	hash_apply(&src->spt_table, copy_spt);
 	return true;
 }
 

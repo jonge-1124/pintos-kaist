@@ -71,7 +71,7 @@ struct page {
 /* The representation of "frame" */
 struct frame {
 	void *kva;
-	int ref_cnt;
+	//int ref_cnt;
 	struct page *page;
 	struct list_elem elem;
 };
