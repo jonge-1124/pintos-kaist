@@ -788,7 +788,7 @@ lazy_load_segment (struct page *page, void *aux) {
 		return false;
 	}
 	memset (kpage + read_bytes, 0, zero_bytes);
-	free(aux);
+	
 	
 	return true;
 }

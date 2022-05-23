@@ -228,10 +228,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	//void *user_rsp = thread_current()->save_rsp;
 	void *user_rsp = thread_current()->save_rsp;
 
-	
+	if (addr == NULL) valid = false;
 	if (page == NULL) 
 	{
-		
 		if (user_rsp <= addr && addr <= USER_STACK)
 		{
 			unsigned long check_max = addr;
@@ -253,6 +252,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	if (!valid)
 	{
 		// process exit & resource free
+		struct thread *curr = thread_current();
+		curr->exit_status = -1;
+		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 		thread_exit();
 	}
 	

@@ -15,7 +15,7 @@
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
-void is_valid_access(void *user_provided_pointer);
+void is_valid_access(void *user_provided_pointer, struct intr_frame *f);
 void exit(int status);
 
 /* System call.
@@ -67,14 +67,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		
 		case SYS_FORK :
 		{	
-			is_valid_access(f->R.rdi);
+			is_valid_access(f->R.rdi,f);
 			f->R.rax = process_fork(f->R.rdi, f);
 			break;
 		}
 
 		case SYS_EXEC :
 		{	
-			is_valid_access(f->R.rdi);	
+			is_valid_access(f->R.rdi,f);	
 
 			char *fn_copy = palloc_get_page(PAL_ZERO);
 			if (fn_copy == NULL) exit(-1);
@@ -94,14 +94,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		case SYS_CREATE : 
 		{	
-			is_valid_access(f->R.rdi);
+			is_valid_access(f->R.rdi,f);
 			f->R.rax = filesys_create(f->R.rdi, f->R.rsi); 
 			break;
 		}
 
 		case SYS_REMOVE :
 		{	
-			is_valid_access(f->R.rdi);
+			is_valid_access(f->R.rdi,f);
 			f->R.rax = filesys_remove(f->R.rdi);
 			break;
 		}
@@ -109,7 +109,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_OPEN :
 		{		
 			struct thread *cur = thread_current();
-			is_valid_access(f->R.rdi);	
+			is_valid_access(f->R.rdi,f);	
 			struct file *file_o = filesys_open(f->R.rdi);
 				
 			if (file_o != NULL)
@@ -202,7 +202,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			void *buffer = f->R.rsi;
 			unsigned size = f->R.rdx;
-			is_valid_access(buffer);
+			is_valid_access(buffer,f);
 
 			struct thread *cur = thread_current();
 			struct file *f_read = NULL;
@@ -260,7 +260,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			void *buffer = f->R.rsi;
 			unsigned size = f->R.rdx;
-			is_valid_access(buffer);
+			is_valid_access(buffer,f);
 			struct file *f_write = NULL;
 
 			struct thread *cur = thread_current();
@@ -430,16 +430,31 @@ syscall_handler (struct intr_frame *f UNUSED) {
 }
 
 
-void is_valid_access(void *va)
+void is_valid_access(void *va, struct intr_frame *f)
 {
 	if (va == NULL) exit(-1);
 	if (is_kernel_vaddr(va))  exit(-1);
 
+	
 	void *page = pml4_get_page(thread_current()->pml4,va);
 	if (page==NULL) 
 	{
-		if (spt_find_page(&thread_current()->spt, va) == NULL) exit(-1);
+		if (spt_find_page(&thread_current()->spt, va) == NULL)
+		{
+			/* even though page not existed at spt, but need located in stack area
+			if (f->rsp <= va && va <= USER_STACK)
+			{
+				unsigned long check_max = va;
+				if (USER_STACK - check_max < (1<<20))
+				{
+					return;
+				}
+			}
+			*/
+			 exit(-1);
+		}
 	}
+	
 
 	return;
 
