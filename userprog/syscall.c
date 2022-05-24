@@ -204,6 +204,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			unsigned size = f->R.rdx;
 			is_valid_access(buffer,f);
 
+			struct page *page = spt_find_page(&thread_current()->spt, buffer);
+			if (!page->writable) exit(-1);
+
 			struct thread *cur = thread_current();
 			struct file *f_read = NULL;
 
@@ -441,16 +444,19 @@ void is_valid_access(void *va, struct intr_frame *f)
 	{
 		if (spt_find_page(&thread_current()->spt, va) == NULL)
 		{
-			/* even though page not existed at spt, but need located in stack area
-			if (f->rsp <= va && va <= USER_STACK)
+			// even though page not existed at spt, but need located in stack area
+			if (f->rsp - 50 <= va && va <= USER_STACK)
 			{
-				unsigned long check_max = va;
-				if (USER_STACK - check_max < (1<<20))
+				if (USER_STACK - (uint64_t)va < (1<<20)) 
 				{
-					return;
+					void *page = pg_round_down(va);
+					vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, page, true, NULL, NULL);
+					vm_claim_page(page);
+					return ;
 				}
+				exit(-1);
 			}
-			*/
+			
 			 exit(-1);
 		}
 	}

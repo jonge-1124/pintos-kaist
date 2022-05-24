@@ -208,7 +208,7 @@ vm_stack_growth (void *addr UNUSED) {
 	void *page = pg_round_down(addr);
 	vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, page, true, NULL, NULL);
 	vm_claim_page(page);
-	struct page *p = spt_find_page(&thread_current()->spt, page);
+	
 }
 
 /* Handle the fault on write_protected page */
@@ -232,12 +232,17 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 
 	if (addr == NULL) exit(-1);
 	if (is_kernel_vaddr(addr)) exit(-1);
+	
 	if (page == NULL) 
 	{
 		if ( user_rsp - 50 <= addr && (uint64_t)addr <= USER_STACK )
 		{
-			if (USER_STACK - (uint64_t)addr < (1<<20)) vm_stack_growth(addr);
-			return true;
+			if (USER_STACK - (uint64_t)addr < (1<<20)) 
+			{
+				vm_stack_growth(addr);
+				return true;
+			}
+			exit(-1);
 		}
 		else 
 		{
@@ -245,8 +250,10 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		}
 	}
 	
-	
-	if (write && !page->writable) exit(-1);
+	if (write && !(page->writable)) 
+	{
+		exit(-1);
+	}
 	
 	return vm_do_claim_page (page);
 }
@@ -277,7 +284,7 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable);
+	if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) return false;
 	
 	return swap_in(page, frame->kva);
 }
