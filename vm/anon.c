@@ -94,12 +94,5 @@ anon_destroy (struct page *page) {
 		// data stored in disk, need to clear disk sector(frame refcnt = 0)
 		bitmap_set(swap_table.table, (anon_page->saved_sector_start)/8, false);
 	}
-	else
-	{
-		//data stored in frame, need to clear frame
-		//int ref_cnt = page->frame->ref_cnt;
-		//if (ref_cnt == 1 ) 
-		palloc_free_page(page->frame->kva);
-		//else page->frame->ref_cnt--;
-	}
+
 }

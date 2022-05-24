@@ -284,8 +284,10 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) return false;
-	
+	if (pml4_get_page(thread_current()->pml4, page->va) == NULL)
+	{
+		if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) return false;
+	}
 	return swap_in(page, frame->kva);
 }
 
@@ -307,7 +309,7 @@ void copy_spt(struct hash_elem *e, void *aux)
 	bool wr = parent_page ->writable;
 	void *p_va = parent_page->va;
 
-	if (p_type == VM_UNINIT)
+	if (VM_TYPE(p_type) == VM_UNINIT)
 	{
 		vm_initializer *init = parent_page->uninit.init;
 		void *aux = parent_page->uninit.aux;
@@ -358,7 +360,7 @@ void swap_out_and_destroy(struct hash_elem *e, void *aux)
 
 		if (VM_TYPE(type) == VM_ANON || VM_TYPE(type) == VM_FILE) swap_out(page);
 		
-		destroy(page);
+		vm_dealloc_page(page);
 	}
 }
 /* Free the resource hold by the supplemental page table */

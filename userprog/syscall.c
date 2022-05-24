@@ -362,6 +362,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE :
 		{
 			
+			
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
 			struct file *f_close = NULL;
@@ -424,8 +425,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		case SYS_MUNMAP : 
 		{
+			
 			void *addr = f->R.rdi;
 			do_munmap(addr);
+			
 
 		}	
 	}

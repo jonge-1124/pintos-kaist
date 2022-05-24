@@ -13,6 +13,7 @@ struct file_page {
 	bool mmap;
 	bool munmap;
 	int page_num;
+	int bytes_to_read;
 };
 
 void vm_file_init (void);

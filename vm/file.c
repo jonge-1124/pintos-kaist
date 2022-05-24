@@ -22,6 +22,7 @@ struct mmap_info {
 	bool mmap;
 	bool munmap;
 	int page_num;
+	int read_bytes;
 };
 
 /* The initializer of file vm */
@@ -34,6 +35,7 @@ vm_file_init (void) {
 bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
+	
 	page->operations = &file_ops;
 	struct mmap_info *aux = page->uninit.aux;
 
@@ -43,7 +45,8 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page->mmap = aux->mmap;
 	file_page->munmap = aux->munmap;
 	file_page->page_num = aux->page_num;
-
+	file_page->bytes_to_read = aux->read_bytes;
+	
 	file_backed_swap_in(page, kva);
 
 	return true;
@@ -55,42 +58,21 @@ static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
 	int page_num = file_page->page_num;
-	int page_num_written = 0;
+
 
 	for (int i = 0; i<page_num; i++)
 	{
-		int read_byte = file_read_at(file_page->file, page->frame->kva, 4096, file_page->offset);
-		if (read_byte == PGSIZE)
+		int read_byte = file_read_at(file_page->file, page->frame->kva, file_page->bytes_to_read, file_page->offset);
+		int zero_byte = PGSIZE - read_byte;
+		if (zero_byte != 0 )
 		{
-			page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
-			file_page = &page->file;
+			memset(page->frame->kva + read_byte, 0, zero_byte);
 		}
-		else
-		{
-			for (char *start = page->frame->kva + read_byte; start < page->frame->kva + PGSIZE; start++)
-			{
-				*start = 0;
-			}
-			page_num_written = i+1;
 
-			page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
-			file_page = &page->file;
-			break;
-		}
+		struct page *p = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
+		file_page = &p->file;
 	}
 
-	while (page_num_written < page_num)
-	{
-		for (char *start = page->frame->kva; start < page->frame->kva + PGSIZE; start++)
-		{
-			*start = 0;
-		}
-		page_num_written++;
-
-		page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
-		file_page = &page->file;
-
-	}
 
 	return true;
 
@@ -100,16 +82,13 @@ file_backed_swap_in (struct page *page, void *kva) {
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-	if (!page->written) return false;
+	int page_write = file_page->bytes_to_read;
+
+	if (!page->written) return true;
 	else
 	{
-		int page_num = file_page->page_num;
-		for (int i = 0; i<page_num; i++)
-		{
-			file_write_at(file_page->file, page->frame->kva, PGSIZE, file_page->offset);
-			page = spt_find_page(&thread_current()->spt, page->va + PGSIZE);
-			file_page = &page->file;
-		}
+	
+		file_write_at(file_page->file, page->frame->kva, page_write, file_page->offset);
 		page->written = false;
 		return true;
 	}
@@ -123,59 +102,59 @@ file_backed_destroy (struct page *page) {
 	file_backed_swap_out(page);
 	file_close(page->file.file);
 
-	// int ref_cnt = page->frame->ref_cnt;
-	//if (ref_cnt == 1 ) 
-	palloc_free_page(page->frame->kva);
-	//else page->frame->ref_cnt--;
-
 }
 
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
-	if (addr == NULL || length == 0 || pg_ofs(addr) != 0 || file ==file_length(file)==0) return NULL;
+	if (addr == NULL || length == 0 || pg_ofs(addr) != 0 || file_length(file)==0) return NULL;
 
 	int page_num = (length%PGSIZE == 0)? length / PGSIZE : length/PGSIZE  + 1;
-
+	
 	// check if there is an overlap, if so return NULL(fail)
 	for (int i = 0; i < page_num; i++)
 	{
 		if (spt_find_page(&thread_current()->spt, addr + i*PGSIZE) != NULL) return NULL;
 	}
-
+	
+	
 	for (int i = 0; i< page_num; i++)
 	{
-		vm_alloc_page_with_initializer(VM_FILE, addr + i*PGSIZE, writable, NULL, NULL);
-		struct page *p = spt_find_page(&thread_current()->spt, addr + i*PGSIZE);
 		
+		
+		size_t page_read_bytes = length < PGSIZE ? length : PGSIZE;
+		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+		struct mmap_info *aux = malloc(sizeof(struct mmap_info));
 		
 		if (i == 0) 
 		{
-			struct mmap_info *aux = malloc(sizeof(struct mmap_info));
+			
 			aux->file = file;
 			aux->offset = offset;
 			aux->mmap = true;
 			aux->munmap = false;
 			aux->page_num = page_num;
+			aux->read_bytes = page_read_bytes;
 
-			p->uninit.aux = aux;
-			
 		}
 		else
 		{
-			struct mmap_info *aux = malloc(sizeof(struct mmap_info));
+		
 			aux->file = file;
 			aux->offset = offset + i*PGSIZE;
 			aux->mmap = false;
 			aux->munmap = false;
 			aux->page_num = page_num;
-
-			p->uninit.aux = aux;
+			aux->read_bytes = page_read_bytes;
+		
 		}
+		vm_alloc_page_with_initializer(VM_FILE, addr + i*PGSIZE, writable, NULL, aux);
+		length -= page_read_bytes;
 		
 	}
-
-
+	struct page *p = spt_find_page(&thread_current()->spt, addr);
+	
+	return addr;
 
 }
 
@@ -184,21 +163,20 @@ void
 do_munmap (void *addr) {
 	struct page *p = spt_find_page(&thread_current()->spt, addr);
 	
-
+	
 	if (p->file.mmap && !p->file.munmap)
 	{
+		
 		int page_num = p->file.page_num;
 		for(int i= 0; i<page_num; i++)
 		{
 			p = spt_find_page(&thread_current()->spt, addr + i*PGSIZE);
 			
-			file_backed_swap_out(p);
-			
 			spt_remove_page(&thread_current()->spt, p);
+			
 		}
+		
 	}
-	else 
-	{
-		return;
-	}
+	return;
+	
 }
