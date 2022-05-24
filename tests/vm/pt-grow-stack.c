@@ -17,4 +17,5 @@ test_main (void)
   memset (stack_obj, 0, sizeof stack_obj);
   arc4_crypt (&arc4, stack_obj, sizeof stack_obj);
   msg ("cksum: %lu", cksum (stack_obj, sizeof stack_obj));
+  
 }

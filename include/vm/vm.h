@@ -63,9 +63,7 @@ struct page {
 	struct hash_elem hash_elem;
 	bool writable;
 	bool written;
-	enum vm_type type;
-	
-	
+
 };
 
 /* The representation of "frame" */

@@ -24,6 +24,10 @@
         "vm.h": "c",
         "memory_resource": "c",
         "algorithm": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "main.h": "c",
+        "lib.h": "c",
+        "cksum.h": "c",
+        "arc4.h": "c"
     }
 }

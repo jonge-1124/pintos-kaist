@@ -241,7 +241,6 @@ int
 	/* And then load the binary */
 	
 	success = load(file_name, &_if);
-	
 	palloc_free_page (file_name);
 	
 	/* If load failed, quit. */
@@ -251,6 +250,7 @@ int
 
 	
 	/* Start switched process. */
+	
 	do_iret (&_if);
 
 	NOT_REACHED ();
@@ -564,7 +564,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
-
+	
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 	
@@ -612,10 +612,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 
 	success = true;
+	int x = USER_STACK;
 
 done:
 	/* We arrive here whether the load is successful or not. */
 	palloc_free_page(fn_copy);
+	
 	return success;
 }
 
@@ -784,7 +786,6 @@ lazy_load_segment (struct page *page, void *aux) {
 
 	if (file_read (file, kpage, read_bytes) != (int) read_bytes) {
 			
-		free(aux);
 		return false;
 	}
 	memset (kpage + read_bytes, 0, zero_bytes);
@@ -854,14 +855,15 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-	if (vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL))
+
+
+
+	if (vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL))
 	{
 		success = vm_claim_page(stack_bottom);
 		if(success) if_->rsp = USER_STACK;
+		
 	}
-
-	struct page *p = spt_find_page(&thread_current()->spt, stack_bottom);
-	p->type = VM_MARKER_0; 
 
 	return success;
 }

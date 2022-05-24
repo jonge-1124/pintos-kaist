@@ -4,6 +4,7 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 #include "threads/mmu.h"
+#include "userprog/syscall.h"
 
 // frame table implemented by doubly linked list
 struct frame_table frame_table;
@@ -70,7 +71,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 		uninit_new(new_page, upage, init, type, aux, initializer);
 		new_page->writable = writable;
-		new_page->type = VM_UNINIT;
 
 		spt_insert_page(spt, new_page);
 
@@ -166,8 +166,9 @@ vm_evict_frame (void) {
 	// eliminate entry from page table
 	pml4_clear_page(&thread_current()->pml4, victim->page);
 
+	enum vm_type type = victim->page->operations->type;
 	// swap_out
-	if (victim->page->type == VM_ANON || victim->page->type == VM_FILE) swap_out(victim->page);
+	if (VM_TYPE(type) == VM_ANON || VM_TYPE(type) == VM_FILE) swap_out(victim->page);
 
 	// unlink existed pair between page and frame
 	victim->page->frame = NULL;
@@ -205,10 +206,9 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr UNUSED) {
 	void *page = pg_round_down(addr);
-	vm_alloc_page_with_initializer(VM_ANON, page, true, NULL, NULL);
-	
+	vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, page, true, NULL, NULL);
+	vm_claim_page(page);
 	struct page *p = spt_find_page(&thread_current()->spt, page);
-	p->type = VM_MARKER_0;
 }
 
 /* Handle the fault on write_protected page */
@@ -224,39 +224,29 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = spt_find_page(spt, addr);
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	bool valid = true;
-	//void *user_rsp = thread_current()->save_rsp;
+	
+
+	
+	if (user) thread_current()->save_rsp = f->rsp;
 	void *user_rsp = thread_current()->save_rsp;
 
-	if (addr == NULL) valid = false;
+	if (addr == NULL) exit(-1);
+	if (is_kernel_vaddr(addr)) exit(-1);
 	if (page == NULL) 
 	{
-		if (user_rsp <= addr && addr <= USER_STACK)
+		if ( user_rsp - 50 <= addr && (uint64_t)addr <= USER_STACK )
 		{
-			unsigned long check_max = addr;
-			if (USER_STACK - check_max < (1<<20)) vm_stack_growth(addr);
+			if (USER_STACK - (uint64_t)addr < (1<<20)) vm_stack_growth(addr);
+			return true;
 		}
-		else valid = false;
+		else 
+		{
+			exit(-1);
+		}
 	}
 	
-	if (user && is_kernel_vaddr(addr)) 
-	{
-		valid = false;
-	}
 	
-	if (write && !page->writable) 
-	{
-		valid = false;
-	}
-
-	if (!valid)
-	{
-		// process exit & resource free
-		struct thread *curr = thread_current();
-		curr->exit_status = -1;
-		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
-		thread_exit();
-	}
+	if (write && !page->writable) exit(-1);
 	
 	return vm_do_claim_page (page);
 }
@@ -282,7 +272,6 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
-
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
@@ -319,16 +308,17 @@ void copy_spt(struct hash_elem *e, void *aux)
 	}
 	else
 	{
+
 		vm_alloc_page(p_type, p_va, wr);
 		struct page *child_page = spt_find_page(dst, p_va);
 		vm_do_claim_page(child_page);
-		
+			
 
-		if (parent_page->type == VM_ANON) memcpy(&child_page->anon, &parent_page->anon, sizeof(struct anon_page));
-		if (parent_page->type == VM_FILE) memcpy(&child_page->file, &parent_page->file, sizeof(struct file_page));
+		if (VM_TYPE(p_type) == VM_ANON) memcpy(&child_page->anon, &parent_page->anon, sizeof(struct anon_page));
+		if (VM_TYPE(p_type) == VM_FILE) memcpy(&child_page->file, &parent_page->file, sizeof(struct file_page));
 
+		if (parent_page->frame != NULL) memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
 		
-		memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
 	}
 	
 	
@@ -357,8 +347,9 @@ void swap_out_and_destroy(struct hash_elem *e, void *aux)
 	{
 		
 		struct page *page = hash_entry(e, struct page, hash_elem);
-		
-		if (page->type == VM_ANON || page->type == VM_FILE) swap_out(page);
+		enum vm_type type = page->operations->type;
+
+		if (VM_TYPE(type) == VM_ANON || VM_TYPE(type) == VM_FILE) swap_out(page);
 		
 		destroy(page);
 	}
@@ -391,3 +382,4 @@ bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux 
 
   	return pa->va < pb->va;
 }
+

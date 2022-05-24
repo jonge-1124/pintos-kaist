@@ -104,6 +104,7 @@ struct file_table_entity
 
 struct thread
 {
+	
 	/* Owned by thread.c. */
 	tid_t tid;				   /* Thread identifier. */
 	enum thread_status status; /* Thread state. */
@@ -114,7 +115,7 @@ struct thread
 
 	int origi_priority;
 	struct lock *waiting_lock;
-	struct list donation_list;
+	
 
 	int nice;
 	int recent_cpu;
@@ -122,7 +123,7 @@ struct thread
 	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
-
+	struct list donation_list;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
