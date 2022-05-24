@@ -7,7 +7,11 @@ sudo apt-get -y update
 
 # gcc
 sudo apt-get install -y software-properties-common python-software-properties
+<<<<<<< HEAD
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+=======
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+>>>>>>> origin
 sudo apt update && sudo apt install g++-7 -y
 
 #sudo apt-get -y install gcc=4:7.4.0-1ubuntu2.3
