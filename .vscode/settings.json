@@ -28,6 +28,7 @@
         "main.h": "c",
         "lib.h": "c",
         "cksum.h": "c",
-        "arc4.h": "c"
+        "arc4.h": "c",
+        "fstream": "c"
     }
 }

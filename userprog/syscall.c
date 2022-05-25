@@ -74,12 +74,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		case SYS_EXEC :
 		{	
+			
 			is_valid_access(f->R.rdi,f);	
 
 			char *fn_copy = palloc_get_page(PAL_ZERO);
 			if (fn_copy == NULL) exit(-1);
 			strlcpy(fn_copy, f->R.rdi, strlen(f->R.rdi)+1);
-			
+			\
 			if (process_exec(fn_copy) == -1) exit(-1);
 
 			
@@ -362,11 +363,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE :
 		{
 			
-			
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
 			struct file *f_close = NULL;
-
+			
 			if (1<fd)
 			{
 				struct list_elem *curr = list_begin(&cur->file_table);
@@ -400,6 +400,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct file *file = NULL;
 			struct thread *cur = thread_current();
 
+			// find file using fd number
 			if (1<fd)
 			{
 				struct list_elem *curr = list_begin(&cur->file_table);
@@ -416,19 +417,22 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					curr = list_next(curr);
 				}
 			}
+			
+			// can't find file -> return null
 			if (file == NULL) f->R.rax = NULL;
 			else
 			{
-				struct file *reopen_file = file_reopen(file);
-				f->R.rax = do_mmap(addr, length, writable, reopen_file, offset);
+				
+				f->R.rax = do_mmap(addr, length, writable, file, offset);
 			}	
+			break;
 		}
 		case SYS_MUNMAP : 
 		{
 			
 			void *addr = f->R.rdi;
 			do_munmap(addr);
-			
+			break;
 
 		}	
 	}

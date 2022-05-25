@@ -5,6 +5,7 @@
 #include "vm/inspect.h"
 #include "threads/mmu.h"
 #include "userprog/syscall.h"
+#include "vm/file.h"
 
 // frame table implemented by doubly linked list
 struct frame_table frame_table;
@@ -127,6 +128,7 @@ vm_get_victim (void) {
 	struct list *frame_list = &(frame_table.frame_list);
 
 	struct list_elem *curr = needle;
+	if (curr == list_tail(frame_list)) curr = list_begin(frame_list);
 	while(true)
 	{
 		struct frame *f = list_entry(curr, struct frame, elem);
@@ -162,14 +164,14 @@ vm_evict_frame (void) {
 	/* TODO: swap out the victim and return the evicted frame. */
 
 	if (pml4_is_dirty(&thread_current()->pml4, victim->page->va)) victim->page->written = true;
-
+	
 	// eliminate entry from page table
-	pml4_clear_page(&thread_current()->pml4, victim->page);
-
+	pml4_clear_page(&thread_current()->pml4, victim->page->va);
+	
 	enum vm_type type = victim->page->operations->type;
 	// swap_out
 	if (VM_TYPE(type) == VM_ANON || VM_TYPE(type) == VM_FILE) swap_out(victim->page);
-
+	
 	// unlink existed pair between page and frame
 	victim->page->frame = NULL;
 	victim->page = NULL;
@@ -191,6 +193,7 @@ vm_get_frame (void) {
 	{
 		free(frame);
 		frame = vm_evict_frame();
+		
 	} 
 	else	// allocation success, need to push frame to frame table
 	{
@@ -225,7 +228,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	
-
 	
 	if (user) thread_current()->save_rsp = f->rsp;
 	void *user_rsp = thread_current()->save_rsp;
@@ -247,6 +249,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		else 
 		{
 			exit(-1);
+			
 		}
 	}
 	
@@ -254,6 +257,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	{
 		exit(-1);
 	}
+	
 	
 	return vm_do_claim_page (page);
 }
@@ -283,11 +287,14 @@ vm_do_claim_page (struct page *page) {
 	frame->page = page;
 	page->frame = frame;
 
+	
+
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	if (pml4_get_page(thread_current()->pml4, page->va) == NULL)
 	{
 		if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) return false;
 	}
+	
 	return swap_in(page, frame->kva);
 }
 
@@ -308,26 +315,41 @@ void copy_spt(struct hash_elem *e, void *aux)
 	enum vm_type p_type = parent_page->operations->type;
 	bool wr = parent_page ->writable;
 	void *p_va = parent_page->va;
+	vm_initializer *init = parent_page->uninit.init;
 
 	if (VM_TYPE(p_type) == VM_UNINIT)
 	{
-		vm_initializer *init = parent_page->uninit.init;
+		
 		void *aux = parent_page->uninit.aux;
 		vm_alloc_page_with_initializer(parent_page->uninit.type, p_va, wr, init, aux);
 	}
 	else
 	{
-
-		vm_alloc_page(p_type, p_va, wr);
-		struct page *child_page = spt_find_page(dst, p_va);
-		vm_do_claim_page(child_page);
+		if (VM_TYPE(p_type) == VM_ANON)
+		{
+			vm_alloc_page(p_type, p_va, wr);
+			struct page *child_page = spt_find_page(dst, p_va);
+			vm_do_claim_page(child_page);
+			memcpy(&child_page->anon, &parent_page->anon, sizeof(struct anon_page));
+			memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+		} 
+		else
+		{
+			struct mmap_info *aux_child = malloc(sizeof(struct mmap_info));
+			aux_child->file = file_reopen(parent_page->file.file);
+			aux_child->offset = parent_page->file.offset;
+			aux_child->mmap = parent_page->file.mmap;
+			aux_child->munmap = parent_page->file.munmap;
+			aux_child->page_num = parent_page->file.page_num;
+			aux_child->read_bytes = parent_page->file.bytes_to_read;
 			
+			vm_alloc_page_with_initializer(p_type, p_va, wr, NULL, aux_child);
+			struct page *child_page = spt_find_page(dst, p_va);
+			vm_do_claim_page(child_page);
+			free(aux_child);
+			//memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
 
-		if (VM_TYPE(p_type) == VM_ANON) memcpy(&child_page->anon, &parent_page->anon, sizeof(struct anon_page));
-		if (VM_TYPE(p_type) == VM_FILE) memcpy(&child_page->file, &parent_page->file, sizeof(struct file_page));
-
-		if (parent_page->frame != NULL) memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
-		
+		}
 	}
 	
 	
@@ -338,6 +360,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	(src->spt_table).aux = dst;
 	hash_apply(&src->spt_table, copy_spt);
+	
 	return true;
 }
 

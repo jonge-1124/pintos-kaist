@@ -158,7 +158,7 @@ __do_fork (void *aux) {
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if = &parent->uf;
 	bool succ = true;
-
+	
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 	if_.R.rax = 0;
@@ -169,17 +169,22 @@ __do_fork (void *aux) {
 		goto error;
 
 	process_activate (current);
+	
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
+	
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+	{
 		goto error;
+	}	
+	
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 	{
 		goto error;
 	}
 #endif
-
+	
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
@@ -204,7 +209,7 @@ __do_fork (void *aux) {
 		curr = list_next(curr);
 
 	}
-
+	
 	process_init ();
 	// signal finish duplicating resource
 	sema_up(&current->sema_fork);
@@ -294,11 +299,15 @@ process_wait (tid_t child_tid UNUSED) {
 	if (child->wait_complete) return -1;	//wait already called before 
 	child->wait_complete = true;
 
+	
 	sema_down(&child->exit_wait_sema);
+
+	
 	int exit_status = child->exit_status;
 	list_remove(&child->child);
 	sema_up(&child->eliminated);
 
+	
 	return exit_status;
 }
 
@@ -337,9 +346,9 @@ process_exit (void) {
 
 	
 	process_cleanup ();
-
+	
 	sema_up(&curr->exit_wait_sema);
-
+	
 	sema_down(&curr->eliminated);
 	
 }
