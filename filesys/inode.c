@@ -6,9 +6,12 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "filesys/fat.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
+
+extern struct fat_fs *fat_fs;
 
 /* On-disk inode.
  * Must be exactly DISK_SECTOR_SIZE bytes long. */
@@ -33,7 +36,8 @@ struct inode {
 	int open_cnt;                       /* Number of openers. */
 	bool removed;                       /* True if deleted, false otherwise. */
 	int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-	struct inode_disk data;             /* Inode content. */
+	struct inode_disk data;				 /* Inode content. */
+
 };
 
 /* Returns the disk sector that contains byte offset POS within
@@ -74,14 +78,43 @@ inode_create (disk_sector_t sector, off_t length) {
 	/* If this assertion fails, the inode structure is not exactly
 	 * one sector in size, and you should fix that. */
 	ASSERT (sizeof *disk_inode == DISK_SECTOR_SIZE);
+	
 
 	disk_inode = calloc (1, sizeof *disk_inode);
 	if (disk_inode != NULL) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
 		disk_inode->magic = INODE_MAGIC;
-		if (free_map_allocate (sectors, &disk_inode->start)) {
+
+		bool allocate = true;
+		cluster_t index;
+		cluster_t start_disk_cluster;
+		for (int i = 0; i<sectors ; i++)
+		{
+			if ( i == 0 ) 
+			{
+				index = fat_create_chain(0);
+				start_disk_cluster = index;
+				if (index == 0) 
+				{
+					allocate = false;
+				}
+			}	
+			else 
+			{
+				index = fat_create_chain(index);
+				if (index == 0) 
+				{
+					allocate = false;
+					fat_remove_chain(start_disk_cluster, 0);
+				}
+			}	
+		}
+		
+		if (allocate) {
+			disk_inode->start = cluster_to_sector(start_disk_cluster);
 			disk_write (filesys_disk, sector, disk_inode);
+			fat_put(sector_to_cluter(sector), EOChain);
 			if (sectors > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
@@ -90,7 +123,8 @@ inode_create (disk_sector_t sector, off_t length) {
 					disk_write (filesys_disk, disk_inode->start + i, zeros); 
 			}
 			success = true; 
-		} 
+		}
+		
 		free (disk_inode);
 	}
 	return success;
@@ -159,9 +193,8 @@ inode_close (struct inode *inode) {
 
 		/* Deallocate blocks if removed. */
 		if (inode->removed) {
-			free_map_release (inode->sector, 1);
-			free_map_release (inode->data.start,
-					bytes_to_sectors (inode->data.length)); 
+			fat_remove_chain(sector_to_cluster(inode->sector), 0);
+			fat_remove_chain(sector_to_cluster(inode->data.start), 0);
 		}
 
 		free (inode); 

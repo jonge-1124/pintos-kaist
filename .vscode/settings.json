@@ -13,6 +13,8 @@
         "off_t.h": "c",
         "*.tcc": "c",
         "cstdlib": "c",
-        "memory": "c"
+        "memory": "c",
+        "disk.h": "c",
+        "inode.h": "c"
     }
 }

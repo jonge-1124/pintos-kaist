@@ -153,11 +153,37 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
+	fat_fs->fat_length = fat_fs->bs.fat_sectors;
+	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+
+	fat_fs->last_clst = fat_fs->fat_length - 1 ; 
+
+	// Last cluster
+
+	lock_init(&fat_fs->write_lock);
+
 }
 
 /*----------------------------------------------------------------------------*/
 /* FAT handling                                                               */
 /*----------------------------------------------------------------------------*/
+
+//return empty index of fat_fs, return 0 if fail to find empty index
+cluster_t fat_find_empty()
+{
+	cluster_t empty_index = 0;
+	cluster_t num_clusters = fat_fs->fat_length;
+	for (int i = 2; i<num_clusters; i++)
+	{
+		if (fat_fs->fat[i] == 0) 
+		{
+			empty_index = i;
+			break;
+		}	
+		 
+	}
+	return empty_index;
+}
 
 /* Add a cluster to the chain.
  * If CLST is 0, start a new chain.
@@ -165,6 +191,36 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
+
+	
+	cluster_t new_chain_index = fat_find_empty();
+
+	if (clst == 0) 
+	{
+		
+		if (new_chain_index == 0) return 0;
+		else
+		{
+			lock_acquire(&fat_fs->write_lock);
+			fat_fs->fat[new_chain_index] = EOChain;
+			lock_release(&fat_fs->write_lock);
+		}
+
+	}
+	else
+	{
+		
+		if (new_chain_index == 0) return 0;
+		else
+		{
+			lock_acquire(&fat_fs->write_lock);
+			fat_fs->fat[new_chain_index] = fat_fs->fat[clst];
+			fat_fs->fat[clst] = new_chain_index;
+			lock_release(&fat_fs->write_lock);
+		}
+	}
+	return new_chain_index;
+
 }
 
 /* Remove the chain of clusters starting from CLST.
@@ -172,22 +228,52 @@ fat_create_chain (cluster_t clst) {
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
+
+	lock_acquire(&fat_fs->write_lock);
+
+	// remove after clst
+	cluster_t next = fat_fs->fat[clst];
+	fat_fs->fat[clst] = 0;
+
+	while (fat_fs->fat[next] != EOChain)
+	{
+		cluster_t temp = fat_fs->fat[next];
+		fat_fs->fat[next] = 0;
+		next = temp;
+	}
+	fat_fs->fat[next] = 0;
+
+	// set next of pclst EOChain
+	if (pclst != 0) fat_fs->fat[pclst] = EOChain;
+	
+	lock_release(&fat_fs->write_lock);
+
 }
 
 /* Update a value in the FAT table. */
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
+	lock_acquire(&fat_fs->write_lock);
+	fat_fs->fat[clst] = val;
+	lock_release(&fat_fs->write_lock);
 }
 
 /* Fetch a value in the FAT table. */
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
+	return fat_fs->fat[clst];
 }
 
 /* Covert a cluster # to a sector number. */
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
+	return clst + fat_fs->data_start;
+}
+
+cluster_t sector_to_cluster(disk_sector_t sect)
+{
+	return sect - fat_fs->data_start;
 }
