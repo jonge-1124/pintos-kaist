@@ -110,6 +110,7 @@ main (void) {
 	/* Initialize file system. */
 	disk_init ();
 	filesys_init (format_filesys);
+	
 #endif
 
 #ifdef VM

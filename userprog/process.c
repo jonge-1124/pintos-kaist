@@ -334,6 +334,7 @@ process_exit (void) {
 		process_wait(child->tid);
 	}
 
+	dir_close(curr->current_dir);
 	
 	process_cleanup ();
 

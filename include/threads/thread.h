@@ -99,6 +99,7 @@ struct file_table_entity
 {
 	struct file *file;
 	int fd;
+	bool is_file;
 	struct list_elem elem;
 };
 
@@ -154,6 +155,9 @@ struct thread
 	
 	// for file syscall
 	struct list file_table;
+
+	// current directory
+	struct dir *current_dir;
 
 	/* Owned by thread.c. */
 	struct intr_frame tf; /* Information for switching */

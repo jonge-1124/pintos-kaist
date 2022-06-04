@@ -213,6 +213,11 @@ thread_create(const char *name, int priority,
 	
 	list_push_front(&current->children, &t->child);
 
+	if (current->current_dir != NULL)
+	{
+		t->current_dir = dir_reopen(current->current_dir);
+	}
+
 	/* Add to run queue. */
 	thread_unblock(t);
 	if (current->priority < priority) thread_yield();
@@ -644,6 +649,9 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	//init file table
 	list_init(&t->file_table);
+
+	//set current directory
+	t->current_dir = NULL;
 
 }
 

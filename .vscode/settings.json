@@ -15,6 +15,7 @@
         "cstdlib": "c",
         "memory": "c",
         "disk.h": "c",
-        "inode.h": "c"
+        "inode.h": "c",
+        "directory.h": "c"
     }
 }

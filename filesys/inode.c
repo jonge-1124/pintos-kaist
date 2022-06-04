@@ -18,8 +18,10 @@ extern struct fat_fs *fat_fs;
 struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	off_t length;                       /* File size in bytes. */
-	unsigned magic;                     /* Magic number. */
-	uint32_t unused[125];               /* Not used. */
+	unsigned magic;						/* Magic number. */
+
+	int is_file;							// 0 = dir, 1 = file
+	uint32_t unused[124];               /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -69,7 +71,7 @@ inode_init (void) {
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
 bool
-inode_create (disk_sector_t sector, off_t length) {
+inode_create (disk_sector_t sector, off_t length, int is_dir) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
@@ -84,6 +86,7 @@ inode_create (disk_sector_t sector, off_t length) {
 	if (disk_inode != NULL) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
+		disk_inode->is_file = is_dir;
 		disk_inode->magic = INODE_MAGIC;
 
 		bool allocate = true;
@@ -115,6 +118,7 @@ inode_create (disk_sector_t sector, off_t length) {
 			disk_inode->start = cluster_to_sector(start_disk_cluster);
 			disk_write (filesys_disk, sector, disk_inode);
 			fat_put(sector_to_cluter(sector), EOChain);
+			
 			if (sectors > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
@@ -343,4 +347,10 @@ inode_allow_write (struct inode *inode) {
 off_t
 inode_length (const struct inode *inode) {
 	return inode->data.length;
+}
+
+bool inode_is_file(struct inode *inode)
+{
+	if (inode->data.is_file) return true;
+	else return false;
 }

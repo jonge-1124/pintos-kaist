@@ -11,6 +11,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "filesys/directory.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -109,19 +110,52 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{		
 			struct thread *cur = thread_current();
 			is_valid_access(f->R.rdi);	
-			struct file *file_o = filesys_open(f->R.rdi);
+			struct file *file_o = NULL;
+			struct dir *dir_o = NULL;
+			bool is_file;
+
+			char *copy = malloc(sizeof(strlen(f->R.rdi)));
+			strcpy(copy, f->R.rdi);
+
+			char file_name[NAME_MAX + 1];
+			struct dir *dir = dir_parse(copy, file_name);
+
+			struct inode *inode = NULL;
+			if (dir != NULL) dir_lookup(dir,file_name, &inode);
+			if (inode_is_file(inode))
+			{
+				file_o = file_open(inode);
+				is_file = true;
+			}
+			else
+			{
+				dir_o = dir_open(inode);
+				is_file = false;
+			}
 				
-			if (file_o != NULL)
+			if (!(file_o == NULL && dir_o == NULL))
 			{
 				struct file_table_entity *e = malloc(sizeof(struct file_table_entity));
 				if (e==NULL) 
 				{
 					f->R.rax = -1;
-					file_close(file_o);
+					if (is_file) file_close(file_o);
+					else dir_close(dir_o);
 				}
 				else
 				{
-					e->file = file_o;
+					if (is_file) 
+					{
+						e->file = file_o;
+						e->is_file = true;
+					}
+					else 
+					{
+						e->dir = dir_o;
+						e->is_file = false;
+					}
+
+
 					int find_fd = 2; 
 					struct list_elem *curr_elem= list_begin(&cur->file_table);
 					struct list_elem *last_elem = list_end(&cur->file_table);
@@ -205,6 +239,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			struct thread *cur = thread_current();
 			struct file *f_read = NULL;
+			bool is_file;
 
 			if (0 <= fd)
 			{
@@ -217,6 +252,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					if (e->fd == fd) 
 					{
 						f_read = e->file;
+						is_file = e->is_file;
 						break;
 					}
 					curr = list_next(curr);
@@ -241,6 +277,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				else
 				{
 					if (f_read == NULL) read_byte = -1;
+					else if(is_file == false) read_byte = -1;
 					else
 					{
 						lock_acquire(&file_lock);
@@ -261,6 +298,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			unsigned size = f->R.rdx;
 			is_valid_access(buffer);
 			struct file *f_write = NULL;
+			bool is_file;
 
 			struct thread *cur = thread_current();
 
@@ -272,7 +310,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				while(curr != last)
 				{
 					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
-					if (e->fd == fd) f_write = e->file;
+					if (e->fd == fd) 
+					{
+						f_write = e->file;
+						is_file = e->is_file;
+					}
 					curr = list_next(curr);
 				}
 
@@ -290,6 +332,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				else 
 				{
 					if (f_write == NULL) write_byte = -1;
+					else if (is_file == false) write_byte = -1;
 					else
 					{
 						lock_acquire(&file_lock);
@@ -372,8 +415,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) 
 					{
-						f_close = e->file;
-						file_close(f_close);
+						if (e->is_file) file_close(e->file);
+						else dir_close(e->dir);
+						
 						list_remove(&e->elem);
 						free(e);
 						break;
@@ -382,6 +426,50 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				}
 			}
 			
+			break;
+		}
+		case SYS_CHDIR:
+		{
+			break;
+		}
+		case SYS_MKDIR:
+		{
+			break;
+		}
+		case SYS_READDIR:
+		{
+			break;
+		}
+		case SYS_ISDIR:
+		{
+			int fd = f->R.rdi;
+			if (1<fd)
+			{
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
+					if (e->fd == fd) 
+					{
+						if (e->is_file) f->R.rax = 0;
+						else f->R.rax = 1;
+						break;
+					}	
+					curr = list_next(curr);
+				}
+				if (curr == last) f-R.rax = 0;
+			}
+
+			break;
+		}
+		case SYS_INUMBER:
+		{
+			break;
+		}
+		case SYS_SYMLINK:
+		{
 			break;
 		}
 	}

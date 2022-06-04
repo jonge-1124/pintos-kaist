@@ -8,6 +8,9 @@
 #include "filesys/directory.h"
 #include "devices/disk.h"
 #include "filesys/fat.h"
+#include "threads/thread.h"
+
+
 
 /* The disk that contains the file system. */
 struct disk *filesys_disk;
@@ -40,6 +43,7 @@ filesys_init (bool format) {
 
 	free_map_open ();
 #endif
+	thread_current()->current_dir = dir_open_root();
 }
 
 /* Shuts down the file system module, writing any unwritten data
@@ -61,18 +65,24 @@ filesys_done (void) {
 bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
-	struct dir *dir = dir_open_root ();
+	char *copy = malloc(sizeof(strlen(name)));
+	strcpy(copy, name);
+
+	char file_name[NAME_MAX + 1];
+	struct dir *dir = dir_parse(copy, file_name);
+
 	cluster_t inode_cluster = fat_create_chain(0);
 	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
 
 	bool success = (dir != NULL
 			&& inode_cluster
-			&& inode_create (cluster_to_sector(inode_cluster), initial_size)
-			&& dir_add (dir, name, inode_sector));
+			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
+			&& dir_add (dir, file_name, inode_sector));
 	if (!success && inode_sector != 0)
 		fat_remove_chain(inode_cluster, 0);
 	dir_close (dir);
 
+	free(copy);
 	return success;
 }
 
@@ -83,13 +93,20 @@ filesys_create (const char *name, off_t initial_size) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
-	struct dir *dir = dir_open_root ();
+	char *copy = malloc(sizeof(strlen(name)));
+	strcpy(copy, name);
+
+	char file_name[NAME_MAX + 1];
+	struct dir *dir = dir_parse(copy, file_name);
+
+
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
+		dir_lookup (dir, file_name, &inode);
 	dir_close (dir);
 
+	free(copy);
 	return file_open (inode);
 }
 
@@ -99,9 +116,37 @@ filesys_open (const char *name) {
  * or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) {
-	struct dir *dir = dir_open_root ();
-	bool success = dir != NULL && dir_remove (dir, name);
+	bool success;
+	char *copy = malloc(sizeof(strlen(name)));
+	strcpy(copy, name);
+
+	char file_name[NAME_MAX + 1];
+	struct dir *dir = dir_parse(copy, file_name);
+
+	struct inode *inode = NULL;
+	if (dir != NULL) dir_lookup(dir, file_name, &inode);
+
+	if (inode_is_file(inode))
+	{
+		bool success = dir != NULL && dir_remove (dir, file_name);
+	}
+	else	// inode is for directory
+	{
+		struct dir *dir_inode = dir_open(inode);
+		bool empty;
+		char name[NAME_MAX+1];
+
+		dir_readdir(dir_inode, name);	// read "." entry
+		dir_readdir(dir_inode, name);	// read ".." entry
+		if (dir_readdir(dir_inode ,name) == false) empty = true;	// read next entry
+		else empty = false;
+
+		if (empty) success = dir_remove(dir, file_name);
+		else dir_close(inode);
+		
+	}
 	dir_close (dir);
+	free(copy);
 
 	return success;
 }

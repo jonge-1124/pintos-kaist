@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir {
@@ -16,14 +17,15 @@ struct dir {
 struct dir_entry {
 	disk_sector_t inode_sector;         /* Sector number of header. */
 	char name[NAME_MAX + 1];            /* Null terminated file name. */
-	bool in_use;                        /* In use or free? */
+	bool in_use; 
+	struct inode_disk *inode;                       /* In use or free? */
 };
 
 /* Creates a directory with space for ENTRY_CNT entries in the
  * given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt) {
-	return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+	return inode_create (sector, entry_cnt * sizeof (struct dir_entry), 0);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -213,4 +215,46 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 		}
 	}
 	return false;
+}
+
+struct dir *dir_parse(char *path, char *file_name)
+{
+	struct dir *dir;
+	if (path == NULL || file_name == NULL) return NULL;
+	if (strlen(path) == 0) return NULL;
+
+	char *token, *next, *save;
+	token = strtok_r (path, "/", &save);
+	next = strtok_r (NULL, "/", &save);
+
+	if (token == "")
+	{
+		dir = dir_open_root();
+	}
+	else if (token == ".")
+	{
+		dir = dir_open(thread_current()->current_dir->inode);
+	}
+	else if (token == "..")
+	{
+		struct inode *inode;
+		dir_lookup(thread_current()->current_dir, "..", &inode);
+		dir = dir_open(inode);
+	}
+
+	token = next;
+	next = strtok_r(NULL, "/", &save);
+
+	while (token != NULL && next != NULL)
+	{
+		struct inode *inode;
+		dir_lookup(dir, token, &inode);
+		if (inode->data.is_file) return NULL;
+
+		dir_close(dir);
+		dir = dir_open(inode);
+		
+		token = next;
+		next = strtok_r(NULL, "/", &save);
+	}
 }
