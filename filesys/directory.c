@@ -17,8 +17,8 @@ struct dir {
 struct dir_entry {
 	disk_sector_t inode_sector;         /* Sector number of header. */
 	char name[NAME_MAX + 1];            /* Null terminated file name. */
-	bool in_use; 
-	struct inode_disk *inode;                       /* In use or free? */
+	bool in_use; 						/* In use or free? */
+	struct inode_disk *inode;           /* pointer to disk_inode for dir_entry */            
 };
 
 /* Creates a directory with space for ENTRY_CNT entries in the
@@ -36,6 +36,7 @@ dir_open (struct inode *inode) {
 	if (inode != NULL && dir != NULL) {
 		dir->inode = inode;
 		dir->pos = 0;
+		inode_set_use(inode, true);
 		return dir;
 	} else {
 		inode_close (inode);
@@ -257,4 +258,9 @@ struct dir *dir_parse(char *path, char *file_name)
 		token = next;
 		next = strtok_r(NULL, "/", &save);
 	}
+}
+
+disk_sector_t dir_inode_sector(struct dir *dir)
+{
+	return inode_get_inumber(dir->inode);
 }

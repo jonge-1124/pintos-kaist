@@ -132,6 +132,7 @@ filesys_remove (const char *name) {
 	}
 	else	// inode is for directory
 	{
+		if (inode_get_inumber(inode) == ROOT_DIR_SECTOR) return false;
 		struct dir *dir_inode = dir_open(inode);
 		bool empty;
 		char name[NAME_MAX+1];
@@ -168,4 +169,42 @@ do_format (void) {
 #endif
 
 	printf ("done.\n");
+}
+
+bool
+filesys_create_dir (const char *name, off_t initial_size) {
+	disk_sector_t inode_sector = 0;
+	char *copy = malloc(sizeof(strlen(name)));
+	strcpy(copy, name);
+
+	char file_name[NAME_MAX + 1];
+	struct dir *dir = dir_parse(copy, file_name);
+
+	cluster_t inode_cluster = fat_create_chain(0);
+	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
+
+	bool success = (dir != NULL
+			&& inode_cluster
+			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
+			&& dir_add (dir, file_name, inode_sector));
+	if (!success && inode_sector != 0)
+	{
+		fat_remove_chain(inode_cluster, 0);
+		dir_close (dir);
+		free(copy);
+		return success;
+	}
+	else
+	{
+		struct inode *new_inode = inode_open(inode_sector);
+		struct dir *new_dir = dir_open(new_inode);
+
+		dir_add(new_dir, ".", inode_sector);
+		dir_add(new_dir, "..", dir_inode_sector(dir));
+
+		dir_close(dir);
+		dir_close(new_dir);
+		free(copy);
+		return success;
+	}	
 }

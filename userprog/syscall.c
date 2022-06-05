@@ -12,6 +12,8 @@
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include "filesys/directory.h"
+#include <string.h>
+#include "filesys/inode.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -430,14 +432,76 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		case SYS_CHDIR:
 		{
+			char *path_name = f->R.rdi;
+			is_valid_access(path_name);
+			char *copy = malloc(sizeof(strlen(path_name)));
+			strcpy(copy, path_name);
+
+			char file_name[NAME_MAX + 1];
+			struct dir *dir = dir_parse(copy, file_name);
+
+			struct inode *inode;
+			if (dir != NULL) dir_lookup(dir, file_name, &inode);
+			if (inode_is_file(inode)) f->R.rax = 0;
+			else
+			{
+				struct dir *new = dir_open(inode);
+				dir_close(thread_current()->current_dir);
+				thread_current()->current_dir = new;
+				f->R.rax = 1;
+			}
+
+			free(copy);
+
 			break;
 		}
 		case SYS_MKDIR:
 		{
+			char *path_name = f->R.rdi;
+			is_valid_access(path_name);
+			filesys_create_dir(path_name, 512);
 			break;
 		}
 		case SYS_READDIR:
 		{
+			int fd = f->R.rdi;
+			char name = f->R.rsi;
+			is_valid_access(name);
+			bool success;
+
+			struct dir *dir;
+			if (1<fd)
+			{
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
+					if (e->fd == fd) 
+					{
+						if (!e->is_file) 
+						{
+							dir = e->dir;
+							success = dir_readdir(dir, name);
+							if (!success) f->R.rax = success;
+							else
+							{
+								while (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+								{
+									success = dir_readdir(dir,name);
+								}
+								f->R.rax = success;
+							}
+						}
+						break;
+					}	
+					curr = list_next(curr);
+				}
+				if (curr == last) f->R.rax = 0;
+			}
+
+
 			break;
 		}
 		case SYS_ISDIR:
@@ -459,17 +523,60 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					}	
 					curr = list_next(curr);
 				}
-				if (curr == last) f-R.rax = 0;
+				if (curr == last) f->R.rax = 0;
 			}
 
 			break;
 		}
 		case SYS_INUMBER:
 		{
+			int fd = f->R.rdi;
+			if (1<fd)
+			{
+				struct list_elem *curr = list_begin(&cur->file_table);
+				struct list_elem *last = list_end(&cur->file_table);
+			
+				while(curr != last)
+				{
+					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
+					if (e->fd == fd) 
+					{
+						if (e->is_file) f->R.rax = file_inode_sector(e->file);
+						else f->R.rax = dir_inode_sector(e->dir);
+						break;
+					}	
+					curr = list_next(curr);
+				}
+				if (curr == last) f->R.rax = -1;
+			}
 			break;
 		}
 		case SYS_SYMLINK:
 		{
+			char *target = f->R.rdi;
+			char *linkpath = f->R.rsi;
+			is_valid_access(target);
+			is_valid_access(linkpath);
+
+			char *copy = malloc(sizeof(strlen(target)));
+			strcpy(copy, target);
+
+			char file_name[NAME_MAX + 1];
+
+			struct dir *cur_dir = thread_current()->current_dir;
+			struct dir *target_dir = dir_parse(copy, file_name);
+
+			struct inode *inode;
+			if (dir_lookup(target_dir, file_name, &inode))
+			{
+				dir_add(cur_dir, linkpath, inode_get_inumber(inode));
+			}
+			else
+			{
+				f->R.rax = -1;
+			}
+			
+			
 			break;
 		}
 	}

@@ -19,7 +19,6 @@ struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;						/* Magic number. */
-
 	int is_file;							// 0 = dir, 1 = file
 	uint32_t unused[124];               /* Not used. */
 };
@@ -39,7 +38,7 @@ struct inode {
 	bool removed;                       /* True if deleted, false otherwise. */
 	int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
 	struct inode_disk data;				 /* Inode content. */
-
+	bool in_use;
 };
 
 /* Returns the disk sector that contains byte offset POS within
@@ -71,7 +70,7 @@ inode_init (void) {
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
 bool
-inode_create (disk_sector_t sector, off_t length, int is_dir) {
+inode_create (disk_sector_t sector, off_t length, int is_file) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
@@ -86,7 +85,7 @@ inode_create (disk_sector_t sector, off_t length, int is_dir) {
 	if (disk_inode != NULL) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
-		disk_inode->is_file = is_dir;
+		disk_inode->is_file = is_file;
 		disk_inode->magic = INODE_MAGIC;
 
 		bool allocate = true;
@@ -353,4 +352,9 @@ bool inode_is_file(struct inode *inode)
 {
 	if (inode->data.is_file) return true;
 	else return false;
+}
+
+void inode_set_use(struct inode *inode, bool in_use)
+{
+	inode->in_use = in_use;
 }

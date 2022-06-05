@@ -98,6 +98,7 @@ struct donation
 struct file_table_entity
 {
 	struct file *file;
+	struct dir *dir;
 	int fd;
 	bool is_file;
 	struct list_elem elem;
