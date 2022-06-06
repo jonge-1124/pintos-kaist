@@ -160,7 +160,7 @@ file_tell (struct file *file) {
 	return file->pos;
 }
 
-disk_sector_t file_inode_sector(struct file *file)
+uint32_t file_inode_sector(struct file *file)
 {
 	return inode_get_inumber(file->inode);
 }

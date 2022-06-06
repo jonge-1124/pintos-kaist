@@ -15,6 +15,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "filesys/directory.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -600,7 +601,7 @@ idle(void *idle_started_ UNUSED)
 	}
 }
 
-/* Function used as the basis for a kernel thread. */
+/* Function used asf the basis for a kernel thread. */
 static void
 kernel_thread(thread_func *function, void *aux)
 {
@@ -649,7 +650,7 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	//init file table
 	list_init(&t->file_table);
-
+	
 	//set current directory
 	t->current_dir = NULL;
 

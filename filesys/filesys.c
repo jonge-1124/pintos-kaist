@@ -66,22 +66,27 @@ bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
 	char *copy = malloc(sizeof(strlen(name)));
-	strcpy(copy, name);
-
+	strlcpy(copy, name,strlen(name)+1);
+	
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);
+	
+	
 
 	cluster_t inode_cluster = fat_create_chain(0);
 	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
-
+	//bool r;
 	bool success = (dir != NULL
 			&& inode_cluster
 			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
-			&& dir_add (dir, file_name, inode_sector));
+			&& (dir_add (dir, file_name, inode_sector)));
+	//ASSERT(r == true);
+	
 	if (!success && inode_sector != 0)
 		fat_remove_chain(inode_cluster, 0);
+	
 	dir_close (dir);
-
+	
 	free(copy);
 	return success;
 }
@@ -94,18 +99,19 @@ filesys_create (const char *name, off_t initial_size) {
 struct file *
 filesys_open (const char *name) {
 	char *copy = malloc(sizeof(strlen(name)));
-	strcpy(copy, name);
+	strlcpy(copy, name, strlen(name)+1);
 
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);
-
+	printf("%d\n", dir_inode_sector(dir));
+	
 
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
 		dir_lookup (dir, file_name, &inode);
 	dir_close (dir);
-
+	
 	free(copy);
 	return file_open (inode);
 }
@@ -118,7 +124,7 @@ bool
 filesys_remove (const char *name) {
 	bool success;
 	char *copy = malloc(sizeof(strlen(name)));
-	strcpy(copy, name);
+	strlcpy(copy, name, strlen(name)+1);
 
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);
@@ -132,7 +138,7 @@ filesys_remove (const char *name) {
 	}
 	else	// inode is for directory
 	{
-		if (inode_get_inumber(inode) == ROOT_DIR_SECTOR) return false;
+		if (inode_get_inumber(inode) == cluster_to_sector(ROOT_DIR_CLUSTER)) return false;
 		struct dir *dir_inode = dir_open(inode);
 		bool empty;
 		char name[NAME_MAX+1];
@@ -160,6 +166,8 @@ do_format (void) {
 #ifdef EFILESYS
 	/* Create FAT and save it to the disk. */
 	fat_create ();
+	if (!dir_create (cluster_to_sector(ROOT_DIR_CLUSTER), 16))
+		PANIC ("root directory creation failed");
 	fat_close ();
 #else
 	free_map_create ();
@@ -175,7 +183,7 @@ bool
 filesys_create_dir (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
 	char *copy = malloc(sizeof(strlen(name)));
-	strcpy(copy, name);
+	strlcpy(copy, name, strlen(name)+1);
 
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);

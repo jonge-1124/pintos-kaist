@@ -62,6 +62,8 @@ static struct list open_inodes;
 void
 inode_init (void) {
 	list_init (&open_inodes);
+	
+	
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -116,7 +118,7 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 		if (allocate) {
 			disk_inode->start = cluster_to_sector(start_disk_cluster);
 			disk_write (filesys_disk, sector, disk_inode);
-			fat_put(sector_to_cluter(sector), EOChain);
+			fat_put(sector_to_cluster(sector), EOChain);
 			
 			if (sectors > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
@@ -140,22 +142,25 @@ struct inode *
 inode_open (disk_sector_t sector) {
 	struct list_elem *e;
 	struct inode *inode;
-
+	
+	
 	/* Check whether this inode is already open. */
 	for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
 			e = list_next (e)) {
+		
 		inode = list_entry (e, struct inode, elem);
 		if (inode->sector == sector) {
 			inode_reopen (inode);
 			return inode; 
 		}
 	}
+	
 
 	/* Allocate memory. */
 	inode = malloc (sizeof *inode);
 	if (inode == NULL)
 		return NULL;
-
+	
 	/* Initialize. */
 	list_push_front (&open_inodes, &inode->elem);
 	inode->sector = sector;
@@ -163,6 +168,7 @@ inode_open (disk_sector_t sector) {
 	inode->deny_write_cnt = 0;
 	inode->removed = false;
 	disk_read (filesys_disk, inode->sector, &inode->data);
+	
 	return inode;
 }
 
@@ -220,10 +226,12 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) {
 	uint8_t *buffer = buffer_;
 	off_t bytes_read = 0;
 	uint8_t *bounce = NULL;
-
+	
 	while (size > 0) {
+		
 		/* Disk sector to read, starting byte offset within sector. */
 		disk_sector_t sector_idx = byte_to_sector (inode, offset);
+		
 		int sector_ofs = offset % DISK_SECTOR_SIZE;
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -274,8 +282,11 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	uint8_t *bounce = NULL;
 
 	if (inode->deny_write_cnt)
+	{
 		return 0;
-
+	}
+		
+	
 	while (size > 0) {
 		/* Sector to write, starting byte offset within sector. */
 		disk_sector_t sector_idx = byte_to_sector (inode, offset);

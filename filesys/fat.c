@@ -228,13 +228,13 @@ fat_create_chain (cluster_t clst) {
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
-
+	
 	lock_acquire(&fat_fs->write_lock);
-
+	
 	// remove after clst
 	cluster_t next = fat_fs->fat[clst];
 	fat_fs->fat[clst] = 0;
-
+	
 	while (fat_fs->fat[next] != EOChain)
 	{
 		cluster_t temp = fat_fs->fat[next];

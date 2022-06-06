@@ -117,7 +117,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			bool is_file;
 
 			char *copy = malloc(sizeof(strlen(f->R.rdi)));
-			strcpy(copy, f->R.rdi);
+			strlcpy(copy, f->R.rdi, strlen(f->R.rdi)+1);
 
 			char file_name[NAME_MAX + 1];
 			struct dir *dir = dir_parse(copy, file_name);
@@ -435,7 +435,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			char *path_name = f->R.rdi;
 			is_valid_access(path_name);
 			char *copy = malloc(sizeof(strlen(path_name)));
-			strcpy(copy, path_name);
+			strlcpy(copy, path_name,strlen(path_name)+1);
 
 			char file_name[NAME_MAX + 1];
 			struct dir *dir = dir_parse(copy, file_name);
@@ -466,6 +466,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{
 			int fd = f->R.rdi;
 			char name = f->R.rsi;
+			struct thread *cur = thread_current();
 			is_valid_access(name);
 			bool success;
 
@@ -507,6 +508,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_ISDIR:
 		{
 			int fd = f->R.rdi;
+			struct thread *cur = thread_current();
 			if (1<fd)
 			{
 				struct list_elem *curr = list_begin(&cur->file_table);
@@ -531,6 +533,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_INUMBER:
 		{
 			int fd = f->R.rdi;
+			struct thread *cur = thread_current();
 			if (1<fd)
 			{
 				struct list_elem *curr = list_begin(&cur->file_table);
@@ -559,7 +562,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			is_valid_access(linkpath);
 
 			char *copy = malloc(sizeof(strlen(target)));
-			strcpy(copy, target);
+			strlcpy(copy, target,strlen(target)+1);
 
 			char file_name[NAME_MAX + 1];
 

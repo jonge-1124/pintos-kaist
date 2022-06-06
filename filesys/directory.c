@@ -6,6 +6,7 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "filesys/fat.h"
 
 /* A directory. */
 struct dir {
@@ -49,7 +50,7 @@ dir_open (struct inode *inode) {
  * Return true if successful, false on failure. */
 struct dir *
 dir_open_root (void) {
-	return dir_open (inode_open (ROOT_DIR_SECTOR));
+	return dir_open (inode_open (cluster_to_sector(ROOT_DIR_CLUSTER)));
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
@@ -89,7 +90,8 @@ lookup (const struct dir *dir, const char *name,
 	ASSERT (name != NULL);
 
 	for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-			ofs += sizeof e)
+			ofs += sizeof e){
+				
 		if (e.in_use && !strcmp (name, e.name)) {
 			if (ep != NULL)
 				*ep = e;
@@ -97,6 +99,7 @@ lookup (const struct dir *dir, const char *name,
 				*ofsp = ofs;
 			return true;
 		}
+			}	
 	return false;
 }
 
@@ -116,6 +119,8 @@ dir_lookup (const struct dir *dir, const char *name,
 		*inode = inode_open (e.inode_sector);
 	else
 		*inode = NULL;
+			
+		
 
 	return *inode != NULL;
 }
@@ -131,18 +136,18 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	struct dir_entry e;
 	off_t ofs;
 	bool success = false;
-
+	
 	ASSERT (dir != NULL);
 	ASSERT (name != NULL);
 
 	/* Check NAME for validity. */
 	if (*name == '\0' || strlen (name) > NAME_MAX)
 		return false;
-
+	
 	/* Check that NAME is not in use. */
 	if (lookup (dir, name, NULL, NULL))
 		goto done;
-
+	
 	/* Set OFS to offset of free slot.
 	 * If there are no free slots, then it will be set to the
 	 * current end-of-file.
@@ -154,13 +159,16 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 			ofs += sizeof e)
 		if (!e.in_use)
 			break;
-
+	
 	/* Write slot. */
 	e.in_use = true;
 	strlcpy (e.name, name, sizeof e.name);
 	e.inode_sector = inode_sector;
+	
 	success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-
+	
+	//printf("%d\n", ofs);
+	
 done:
 	return success;
 }
@@ -242,6 +250,16 @@ struct dir *dir_parse(char *path, char *file_name)
 		dir_lookup(thread_current()->current_dir, "..", &inode);
 		dir = dir_open(inode);
 	}
+	else
+	{
+		strlcpy(file_name, path, strlen(path)+1);
+		
+		
+		dir = dir_reopen(thread_current()->current_dir->inode);
+		printf("%d\n", dir_inode_sector(thread_current()->current_dir));
+		printf("%d\n", dir_inode_sector(dir));
+		return dir;
+	}
 
 	token = next;
 	next = strtok_r(NULL, "/", &save);
@@ -250,7 +268,7 @@ struct dir *dir_parse(char *path, char *file_name)
 	{
 		struct inode *inode;
 		dir_lookup(dir, token, &inode);
-		if (inode->data.is_file) return NULL;
+		if (inode_is_file(inode)) return NULL;
 
 		dir_close(dir);
 		dir = dir_open(inode);
@@ -258,6 +276,9 @@ struct dir *dir_parse(char *path, char *file_name)
 		token = next;
 		next = strtok_r(NULL, "/", &save);
 	}
+
+	strlcpy(file_name, token, strlen(token)+1);
+	return dir;
 }
 
 disk_sector_t dir_inode_sector(struct dir *dir)

@@ -1,0 +1,7 @@
+Kernel command line: -q -f run lg-create
+Kernel PANIC at ../../lib/kernel/list.c:78 in list_next(): assertion `is_head (elem) || is_interior (elem)' failed.
+Call stack: 0x8004214737 0x80042149b3 0x800421deaa 0x800421d26a 0x8004208211 0x8004206c24 0x8004206068.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Kernel PANIC recursion at ../../threads/thread.c:283 in thread_current().

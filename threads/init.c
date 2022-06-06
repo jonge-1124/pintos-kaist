@@ -116,12 +116,12 @@ main (void) {
 #ifdef VM
 	vm_init ();
 #endif
-
+	
 	printf ("Boot complete.\n");
-
+	
 	/* Run actions specified on kernel command line. */
 	run_actions (argv);
-
+	
 	/* Finish up. */
 	if (power_off_when_done)
 		power_off ();
@@ -276,27 +276,28 @@ run_actions (char **argv) {
 #endif
 		{NULL, 0, NULL},
 	};
-
+	
 	while (*argv != NULL) {
 		const struct action *a;
 		int i;
-
+		
 		/* Find action name. */
 		for (a = actions; ; a++)
 			if (a->name == NULL)
 				PANIC ("unknown action `%s' (use -h for help)", *argv);
 			else if (!strcmp (*argv, a->name))
 				break;
-
+		
 		/* Check for required arguments. */
 		for (i = 1; i < a->argc; i++)
 			if (argv[i] == NULL)
 				PANIC ("action `%s' requires %d argument(s)", *argv, a->argc - 1);
-
+		
 		/* Invoke action and advance. */
 		a->function (argv);
 		argv += a->argc;
 	}
+	
 
 }
 
