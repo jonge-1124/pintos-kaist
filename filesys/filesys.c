@@ -70,24 +70,28 @@ filesys_create (const char *name, off_t initial_size) {
 	
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);
-	
+	if (dir == NULL) return false;
 	
 
 	cluster_t inode_cluster = fat_create_chain(0);
 	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
-	//bool r;
+	
 	bool success = (dir != NULL
 			&& inode_cluster
 			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
-			&& (dir_add (dir, file_name, inode_sector)));
-	//ASSERT(r == true);
+			&& dir_add (dir, file_name, inode_sector));
+	
 	
 	if (!success && inode_sector != 0)
+	{
 		fat_remove_chain(inode_cluster, 0);
+		
+	}	
 	
 	dir_close (dir);
 	
 	free(copy);
+	
 	return success;
 }
 
@@ -103,7 +107,7 @@ filesys_open (const char *name) {
 
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);
-	printf("%d\n", dir_inode_sector(dir));
+	
 	
 
 	struct inode *inode = NULL;

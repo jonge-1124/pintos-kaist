@@ -1,7 +1,20 @@
-Kernel command line: -q -f run lg-create
-Kernel PANIC at ../../lib/kernel/list.c:78 in list_next(): assertion `is_head (elem) || is_interior (elem)' failed.
-Call stack: 0x8004214737 0x80042149b3 0x800421deaa 0x800421d26a 0x8004208211 0x8004206c24 0x8004206068.
+Kernel command line: -q -f run copen-missing
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  157,081,600 loops/s.
+hd0:0: detected 337 sector (168 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+Formatting file system...done.
+Boot complete.
+Executing 'copen-missing':
+load: copen-missing: open failed
+Kernel PANIC at ../../userprog/process.c:82 in initd(): Fail to launch initd
+
+Call stack: 0x800421472c 0x8004217e1d 0x8004207fab.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Kernel PANIC recursion at ../../threads/thread.c:283 in thread_current().
+Kernel PANIC recursion at ../../devices/timer.c:198 in real_time_sleep().

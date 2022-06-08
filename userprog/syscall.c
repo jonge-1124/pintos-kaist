@@ -123,85 +123,92 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct dir *dir = dir_parse(copy, file_name);
 
 			struct inode *inode = NULL;
-			if (dir != NULL) dir_lookup(dir,file_name, &inode);
-			if (inode_is_file(inode))
-			{
-				file_o = file_open(inode);
-				is_file = true;
-			}
+
+			if (dir == NULL) f->R.rax = -1;
 			else
 			{
-				dir_o = dir_open(inode);
-				is_file = false;
-			}
-				
-			if (!(file_o == NULL && dir_o == NULL))
-			{
-				struct file_table_entity *e = malloc(sizeof(struct file_table_entity));
-				if (e==NULL) 
-				{
-					f->R.rax = -1;
-					if (is_file) file_close(file_o);
-					else dir_close(dir_o);
-				}
+				if (dir_lookup(dir,file_name, &inode) == false) f->R.rax = -1;
 				else
 				{
-					if (is_file) 
+					if (inode_is_file(inode))
 					{
-						e->file = file_o;
-						e->is_file = true;
-					}
-					else 
-					{
-						e->dir = dir_o;
-						e->is_file = false;
-					}
-
-
-					int find_fd = 2; 
-					struct list_elem *curr_elem= list_begin(&cur->file_table);
-					struct list_elem *last_elem = list_end(&cur->file_table);
-
-					if (curr_elem == last_elem)
-					{
-						e->fd = find_fd;
-						list_push_front(&cur->file_table, &e->elem);
-						f->R.rax = 2;
+						file_o = file_open(inode);
+						is_file = true;
 					}
 					else
 					{
-						while (curr_elem != last_elem)
+						dir_o = dir_open(inode);
+						is_file = false;
+					}
+						
+					if (!(file_o == NULL && dir_o == NULL))
+					{
+						struct file_table_entity *e = malloc(sizeof(struct file_table_entity));
+						if (e==NULL) 
 						{
-							struct file_table_entity *traverse = list_entry(curr_elem, struct file_table_entity, elem);
-							if (traverse->fd == find_fd) 
+							f->R.rax = -1;
+							if (is_file) file_close(file_o);
+							else dir_close(dir_o);
+						}
+						else
+						{
+							if (is_file) 
 							{
-								find_fd++;
-								if (list_next(curr_elem) == last_elem)
-								{
-									e->fd = find_fd;
-									list_push_back(&cur->file_table, &e->elem);
-									f->R.rax = e->fd;
-									break;
-								}
-							}	
-							else
+								e->file = file_o;
+								e->is_file = true;
+							}
+							else 
+							{
+								e->dir = dir_o;
+								e->is_file = false;
+							}
+
+
+							int find_fd = 2; 
+							struct list_elem *curr_elem= list_begin(&cur->file_table);
+							struct list_elem *last_elem = list_end(&cur->file_table);
+
+							if (curr_elem == last_elem)
 							{
 								e->fd = find_fd;
-								list_insert(&traverse->elem, &e->elem);
-								f->R.rax = e->fd;
-								break;
+								list_push_front(&cur->file_table, &e->elem);
+								f->R.rax = 2;
 							}
-							curr_elem = list_next(curr_elem);
-						}
-					}	
-				}	
+							else
+							{
+								while (curr_elem != last_elem)
+								{
+									struct file_table_entity *traverse = list_entry(curr_elem, struct file_table_entity, elem);
+									if (traverse->fd == find_fd) 
+									{
+										find_fd++;
+										if (list_next(curr_elem) == last_elem)
+										{
+											e->fd = find_fd;
+											list_push_back(&cur->file_table, &e->elem);
+											f->R.rax = e->fd;
+											break;
+										}
+									}	
+									else
+									{
+										e->fd = find_fd;
+										list_insert(&traverse->elem, &e->elem);
+										f->R.rax = e->fd;
+										break;
+									}
+									curr_elem = list_next(curr_elem);
+								}
+							}	
+						}	
 
+					}
+					else
+					{
+						f->R.rax = -1;
+					}
+				}	
 			}
-			else
-			{
-				f->R.rax = -1;
-			}
-			
 			break;
 		}
 

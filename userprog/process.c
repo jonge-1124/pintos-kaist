@@ -310,7 +310,7 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	file_close(curr->executable);
+	// file_close(curr->executable);
 	
 	struct list_elem *curr_elem = list_begin(&curr->file_table);
 	struct list_elem *last_elem = list_end(&curr->file_table);
@@ -334,7 +334,7 @@ process_exit (void) {
 		process_wait(child->tid);
 	}
 
-	dir_close(curr->current_dir);
+	// dir_close(curr->current_dir);
 	
 	process_cleanup ();
 

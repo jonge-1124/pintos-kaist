@@ -37,7 +37,6 @@ dir_open (struct inode *inode) {
 	if (inode != NULL && dir != NULL) {
 		dir->inode = inode;
 		dir->pos = 0;
-		inode_set_use(inode, true);
 		return dir;
 	} else {
 		inode_close (inode);
@@ -146,8 +145,10 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	
 	/* Check that NAME is not in use. */
 	if (lookup (dir, name, NULL, NULL))
+	{
 		goto done;
-	
+	}
+		
 	/* Set OFS to offset of free slot.
 	 * If there are no free slots, then it will be set to the
 	 * current end-of-file.
@@ -166,8 +167,6 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	e.inode_sector = inode_sector;
 	
 	success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-	
-	//printf("%d\n", ofs);
 	
 done:
 	return success;
@@ -252,12 +251,9 @@ struct dir *dir_parse(char *path, char *file_name)
 	}
 	else
 	{
+		if (strlen(path) > NAME_MAX ) return NULL;
 		strlcpy(file_name, path, strlen(path)+1);
-		
-		
-		dir = dir_reopen(thread_current()->current_dir->inode);
-		printf("%d\n", dir_inode_sector(thread_current()->current_dir));
-		printf("%d\n", dir_inode_sector(dir));
+		dir = dir_reopen(thread_current()->current_dir);
 		return dir;
 	}
 
@@ -276,7 +272,7 @@ struct dir *dir_parse(char *path, char *file_name)
 		token = next;
 		next = strtok_r(NULL, "/", &save);
 	}
-
+	if (strlen(token) > NAME_MAX) return NULL;
 	strlcpy(file_name, token, strlen(token)+1);
 	return dir;
 }

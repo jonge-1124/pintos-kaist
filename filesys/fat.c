@@ -233,21 +233,32 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	
 	// remove after clst
 	cluster_t next = fat_fs->fat[clst];
-	fat_fs->fat[clst] = 0;
-	
-	while (fat_fs->fat[next] != EOChain)
-	{
-		cluster_t temp = fat_fs->fat[next];
-		fat_fs->fat[next] = 0;
-		next = temp;
-	}
-	fat_fs->fat[next] = 0;
 
+	// one element chain
+	if (next == EOChain) 
+	{
+		fat_fs->fat[clst] = 0;
+	}
+	else	// more than one element chain
+	{
+		fat_fs->fat[clst] = 0;
+	
+		while (fat_fs->fat[next] != EOChain)
+		{
+			cluster_t temp = fat_fs->fat[next];
+			fat_fs->fat[next] = 0;
+			next = temp;
+		}
+		
+		fat_fs->fat[next] = 0;
+	}
+	
+	
 	// set next of pclst EOChain
 	if (pclst != 0) fat_fs->fat[pclst] = EOChain;
 	
 	lock_release(&fat_fs->write_lock);
-
+	
 }
 
 /* Update a value in the FAT table. */
