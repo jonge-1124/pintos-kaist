@@ -239,9 +239,9 @@ int
 	process_cleanup ();
 	
 	/* And then load the binary */
-	lock_acquire(&thread_current()->exec_lock);
+	
 	success = load(file_name, &_if);
-	lock_release(&thread_current()->exec_lock);
+	
 	
 	palloc_free_page (file_name);
 
