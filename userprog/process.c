@@ -239,8 +239,10 @@ int
 	process_cleanup ();
 	
 	/* And then load the binary */
-	
+	lock_acquire(&thread_current()->exec_lock);
 	success = load(file_name, &_if);
+	lock_release(&thread_current()->exec_lock);
+	
 	palloc_free_page (file_name);
 
 	/* If load failed, quit. */
@@ -482,6 +484,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Open executable file. */
 	
 	file = filesys_open (file_open);
+	
+
 	if (file != NULL)
 	{
 		file_deny_write(file);

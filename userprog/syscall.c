@@ -96,20 +96,25 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 		case SYS_CREATE : 
 		{	
+			lock_acquire(&file_lock);
 			is_valid_access(f->R.rdi);
 			f->R.rax = filesys_create(f->R.rdi, f->R.rsi); 
+			lock_release(&file_lock);
 			break;
 		}
 
 		case SYS_REMOVE :
 		{	
+			lock_acquire(&file_lock);
 			is_valid_access(f->R.rdi);
 			f->R.rax = filesys_remove(f->R.rdi);
+			lock_release(&file_lock);
 			break;
 		}
 
 		case SYS_OPEN :
 		{		
+			lock_acquire(&file_lock);
 			struct thread *cur = thread_current();
 			is_valid_access(f->R.rdi);	
 			struct file *file_o = NULL;
@@ -209,11 +214,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					}
 				}	
 			}
+			lock_release(&file_lock);
 			break;
 		}
 
 		case SYS_FILESIZE :
 		{
+			lock_acquire(&file_lock);
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
 			struct file *f_size = NULL;
@@ -236,6 +243,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			{
 				f->R.rax = -1;
 			}
+			lock_release(&file_lock);
 			break;
 		}
 
@@ -356,6 +364,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		case SYS_SEEK : 
 		{
+			lock_acquire(&file_lock);
 			int fd = f->R.rdi;
 			unsigned new_pos = f->R.rsi;
 			struct thread *cur = thread_current();
@@ -378,10 +387,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					file_seek(f_seek, new_pos);
 				}
 			}
+			lock_release(&file_lock);
 			break;
 		}
 		case SYS_TELL :
 		{
+			lock_acquire(&file_lock);
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
 			struct file *f_tell = NULL;
@@ -403,11 +414,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					f->R.rax = file_tell(f_tell);
 				}
 			}
+			lock_release(&file_lock);
 			break;
 		}
 		case SYS_CLOSE :
 		{
-			
+			lock_acquire(&file_lock);
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
 			struct file *f_close = NULL;
@@ -432,7 +444,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					curr = list_next(curr);
 				}
 			}
-			
+			lock_release(&file_lock);
 			break;
 		}
 		case SYS_CHDIR:

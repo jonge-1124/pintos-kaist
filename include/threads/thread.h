@@ -157,6 +157,9 @@ struct thread
 	// for file syscall
 	struct list file_table;
 
+	// exec lock
+	struct lock exec_lock;
+
 	// current directory
 	struct dir *current_dir;
 

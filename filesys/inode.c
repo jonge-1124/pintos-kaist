@@ -49,7 +49,16 @@ static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
 	if (pos < inode->data.length)
-		return inode->data.start + pos / DISK_SECTOR_SIZE;
+	{
+		int n = pos / DISK_SECTOR_SIZE;
+		disk_sector_t start = inode->data.start;
+
+		for ( int i = 0; i < n; i++)
+		{
+			start = cluster_to_sector(fat_get(sector_to_cluster(start)));
+		}
+		return start;
+	}	
 	else
 		return -1;
 }

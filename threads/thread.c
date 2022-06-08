@@ -650,6 +650,9 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 
 	//init file table
 	list_init(&t->file_table);
+
+	//init exec lock
+	lock_init(&t->exec_lock);
 	
 	//set current directory
 	t->current_dir = NULL;

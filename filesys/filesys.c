@@ -111,8 +111,6 @@ filesys_open (const char *name) {
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = dir_parse(copy, file_name);
 	
-	
-
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
