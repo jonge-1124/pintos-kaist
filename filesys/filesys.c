@@ -76,10 +76,13 @@ filesys_create (const char *name, off_t initial_size) {
 	cluster_t inode_cluster = fat_create_chain(0);
 	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
 	
+	bool r;
+
 	bool success = (dir != NULL
 			&& inode_cluster
-			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
-			&& dir_add (dir, file_name, inode_sector));
+			&& (r = inode_create (cluster_to_sector(inode_cluster), initial_size, 1))
+			&& (dir_add (dir, file_name, inode_sector)));
+	//ASSERT(r == true);		
 	
 	
 	if (!success && inode_sector != 0)

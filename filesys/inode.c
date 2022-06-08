@@ -19,7 +19,7 @@ struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;						/* Magic number. */
-	int is_file;							// 0 = dir, 1 = file
+	int is_file;						// 0 = dir, 1 = file
 	uint32_t unused[124];               /* Not used. */
 };
 
@@ -75,14 +75,13 @@ bool
 inode_create (disk_sector_t sector, off_t length, int is_file) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
-
 	ASSERT (length >= 0);
 
 	/* If this assertion fails, the inode structure is not exactly
 	 * one sector in size, and you should fix that. */
 	ASSERT (sizeof *disk_inode == DISK_SECTOR_SIZE);
 	
-
+	
 	disk_inode = calloc (1, sizeof *disk_inode);
 	if (disk_inode != NULL) {
 		size_t sectors = bytes_to_sectors (length);
@@ -101,7 +100,8 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 				start_disk_cluster = index;
 				if (index == 0) 
 				{
-					allocate = false;
+					free(disk_inode);
+					return false;
 				}
 			}	
 			else 
@@ -109,8 +109,9 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 				index = fat_create_chain(index);
 				if (index == 0) 
 				{
-					allocate = false;
+					free(disk_inode);
 					fat_remove_chain(start_disk_cluster, 0);
+					return false;
 				}
 			}	
 		}
@@ -123,9 +124,12 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 			if (sectors > 0) {
 				static char zeros[DISK_SECTOR_SIZE];
 				size_t i;
-
+				disk_sector_t location = disk_inode->start;
 				for (i = 0; i < sectors; i++) 
-					disk_write (filesys_disk, disk_inode->start + i, zeros); 
+				{
+					disk_write (filesys_disk, location, zeros); 
+					location = cluster_to_sector(fat_get(sector_to_cluster(location)));
+				}	
 			}
 			success = true; 
 		}

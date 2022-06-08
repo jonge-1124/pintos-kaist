@@ -283,16 +283,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				{
 					read_byte = -1;
 				}
-				else
+				else 
 				{
+					
 					if (f_read == NULL) read_byte = -1;
-					else if(is_file == false) read_byte = -1;
-					else
-					{
-						lock_acquire(&file_lock);
-						read_byte = file_read(f_read, buffer, size);
-						lock_release(&file_lock);
-					}
+					if (is_file == false) read_byte = -1;
+					lock_acquire(&file_lock);
+					read_byte = file_read(f_read, buffer, size);
+					lock_release(&file_lock);
 				}
 				
 				f->R.rax = read_byte;

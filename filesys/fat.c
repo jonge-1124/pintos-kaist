@@ -153,8 +153,9 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
-	fat_fs->fat_length = fat_fs->bs.fat_sectors;
+	
 	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+	fat_fs->fat_length = fat_fs->bs.total_sectors - fat_fs->data_start;
 
 	fat_fs->last_clst = fat_fs->fat_length - 1 ; 
 
