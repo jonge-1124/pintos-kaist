@@ -240,6 +240,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) {
 	off_t bytes_read = 0;
 	uint8_t *bounce = NULL;
 	
+	if (offset + size > inode->data.length) return 0;
+
 	while (size > 0) {
 		
 		/* Disk sector to read, starting byte offset within sector. */
@@ -381,4 +383,10 @@ bool inode_is_file(struct inode *inode)
 void inode_set_use(struct inode *inode, bool in_use)
 {
 	inode->in_use = in_use;
+}
+
+bool inode_is_removed(struct inode *inode)
+{
+	if (inode->removed) return true;
+	else return false;
 }

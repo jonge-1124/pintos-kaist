@@ -120,15 +120,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			struct file *file_o = NULL;
 			struct dir *dir_o = NULL;
 			bool is_file;
-
-			char *copy = malloc(sizeof(strlen(f->R.rdi)));
+			
+			char *copy = palloc_get_page(PAL_ZERO);
 			strlcpy(copy, f->R.rdi, strlen(f->R.rdi)+1);
 
-			char file_name[NAME_MAX + 1];
+			char *file_name = malloc(NAME_MAX + 1);
+			
 			struct dir *dir = dir_parse(copy, file_name);
-
+			
 			struct inode *inode = NULL;
-
+			
 			if (dir == NULL) f->R.rax = -1;
 			else
 			{
@@ -214,6 +215,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					}
 				}	
 			}
+			free(file_name);
+			palloc_free_page(copy);
 			lock_release(&file_lock);
 			break;
 		}
@@ -360,6 +363,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				f->R.rax = write_byte;
 			}
 			else f->R.rax = -1;	
+			
 			break;
 		}
 		case SYS_SEEK : 
@@ -419,10 +423,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		}
 		case SYS_CLOSE :
 		{
+			
 			lock_acquire(&file_lock);
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
-			struct file *f_close = NULL;
+			
 
 			if (1<fd)
 			{
@@ -451,42 +456,59 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		{
 			char *path_name = f->R.rdi;
 			is_valid_access(path_name);
-			char *copy = malloc(sizeof(strlen(path_name)));
+			
+			char *copy = malloc(strlen(path_name)+1);
 			strlcpy(copy, path_name,strlen(path_name)+1);
 
-			char file_name[NAME_MAX + 1];
+			char *file_name = malloc(NAME_MAX + 1);
 			struct dir *dir = dir_parse(copy, file_name);
-
-			struct inode *inode;
-			if (dir != NULL) dir_lookup(dir, file_name, &inode);
-			if (inode_is_file(inode)) f->R.rax = 0;
+			if (dir == NULL) f->R.rax = 0;
 			else
 			{
-				struct dir *new = dir_open(inode);
-				dir_close(thread_current()->current_dir);
-				thread_current()->current_dir = new;
-				f->R.rax = 1;
+				
+				struct inode *inode;
+				if( !dir_lookup(dir, file_name, &inode) ) 
+				{
+					f->R.rax = 0;
+				}		
+				else
+				{
+					if (inode_is_file(inode)) 
+					{
+						f->R.rax = 0;
+					}
+					else
+					{
+						struct dir *new = dir_open(inode);
+						dir_close(thread_current()->current_dir);
+						thread_current()->current_dir = new;
+						f->R.rax = 1;
+					}
+				}	
 			}
-
+			free(file_name);
 			free(copy);
 
 			break;
 		}
 		case SYS_MKDIR:
 		{
+			
 			char *path_name = f->R.rdi;
 			is_valid_access(path_name);
-			filesys_create_dir(path_name, 512);
+			f->R.rax = filesys_create_dir(path_name, 512);
+			
 			break;
 		}
 		case SYS_READDIR:
 		{
+			
 			int fd = f->R.rdi;
-			char name = f->R.rsi;
+			char *name = f->R.rsi;
 			struct thread *cur = thread_current();
 			is_valid_access(name);
 			bool success;
-
+			
 			struct dir *dir;
 			if (1<fd)
 			{
@@ -501,16 +523,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 						if (!e->is_file) 
 						{
 							dir = e->dir;
+							
 							success = dir_readdir(dir, name);
-							if (!success) f->R.rax = success;
-							else
-							{
-								while (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
-								{
-									success = dir_readdir(dir,name);
-								}
-								f->R.rax = success;
-							}
+							if (strcmp(name, ".") == 0) success = dir_readdir(dir,name);
+							if (strcmp(name, "..") == 0) success = dir_readdir(dir,name);
+							
+							f->R.rax = success;
 						}
 						break;
 					}	
@@ -578,7 +596,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			is_valid_access(target);
 			is_valid_access(linkpath);
 
-			char *copy = malloc(sizeof(strlen(target)));
+			char *copy = palloc_get_page(PAL_ZERO);
 			strlcpy(copy, target,strlen(target)+1);
 
 			char file_name[NAME_MAX + 1];
@@ -596,7 +614,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				f->R.rax = -1;
 			}
 			
-			
+			palloc_free_page(copy);
 			break;
 		}
 	}
@@ -610,8 +628,11 @@ void is_valid_access(void *va)
 	if (is_kernel_vaddr(va))  exit(-1);
 
 	void *page = pml4_get_page(thread_current()->pml4,va);
-	if (page==NULL) exit(-1);
-
+	if (page==NULL) 
+	{
+		
+		exit(-1);
+	}
 	return;
 
 }

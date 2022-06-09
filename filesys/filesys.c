@@ -9,6 +9,7 @@
 #include "devices/disk.h"
 #include "filesys/fat.h"
 #include "threads/thread.h"
+#include "threads/palloc.h"
 
 
 
@@ -43,7 +44,11 @@ filesys_init (bool format) {
 
 	free_map_open ();
 #endif
-	thread_current()->current_dir = dir_open_root();
+	struct dir *root = dir_open_root();
+	thread_current()->current_dir = root;
+
+	dir_add(root, ".", dir_inode_sector(root));
+	dir_add(root, "..", dir_inode_sector(root));
 }
 
 /* Shuts down the file system module, writing any unwritten data
@@ -64,36 +69,38 @@ filesys_done (void) {
  * or if internal memory allocation fails. */
 bool
 filesys_create (const char *name, off_t initial_size) {
+	
 	disk_sector_t inode_sector = 0;
-	char *copy = malloc(sizeof(strlen(name)));
+	char *copy = palloc_get_page(PAL_ZERO);
+	if (copy == NULL) return false;
 	strlcpy(copy, name,strlen(name)+1);
 	
-	char file_name[NAME_MAX + 1];
+	char *file_name = malloc(NAME_MAX + 1);
+	if (file_name == NULL) return false;
 	struct dir *dir = dir_parse(copy, file_name);
-	if (dir == NULL) return false;
+	if (dir == NULL) 
+	{
+		palloc_free_page(copy);
+		free(file_name);
+		return false;
+	}
 	
-
 	cluster_t inode_cluster = fat_create_chain(0);
 	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
 	
-	bool r;
-
 	bool success = (dir != NULL
 			&& inode_cluster
-			&& (r = inode_create (cluster_to_sector(inode_cluster), initial_size, 1))
-			&& (dir_add (dir, file_name, inode_sector)));
-	//ASSERT(r == true);		
-	
-	
+			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
+			&& dir_add (dir, file_name, inode_sector));
+			
 	if (!success && inode_sector != 0)
 	{
 		fat_remove_chain(inode_cluster, 0);
-		
 	}	
 	
 	dir_close (dir);
-	
-	free(copy);
+	free(file_name);
+	palloc_free_page(copy);
 	
 	return success;
 }
@@ -105,10 +112,11 @@ filesys_create (const char *name, off_t initial_size) {
  * or if an internal memory allocation fails. */
 struct file *
 filesys_open (const char *name) {
-	char *copy = malloc(sizeof(strlen(name)));
+	char *copy = palloc_get_page(PAL_ZERO);
+	if (copy == NULL) return NULL;
 	strlcpy(copy, name, strlen(name)+1);
 
-	char file_name[NAME_MAX + 1];
+	char *file_name = malloc(NAME_MAX + 1);
 	struct dir *dir = dir_parse(copy, file_name);
 	
 	struct inode *inode = NULL;
@@ -117,7 +125,8 @@ filesys_open (const char *name) {
 		dir_lookup (dir, file_name, &inode);
 	dir_close (dir);
 	
-	free(copy);
+	palloc_free_page(copy);
+	free(file_name);
 	return file_open (inode);
 }
 
@@ -128,10 +137,11 @@ filesys_open (const char *name) {
 bool
 filesys_remove (const char *name) {
 	bool success;
-	char *copy = malloc(sizeof(strlen(name)));
+	char *copy = palloc_get_page(PAL_ZERO);
+	if (copy == NULL) return false;
 	strlcpy(copy, name, strlen(name)+1);
 
-	char file_name[NAME_MAX + 1];
+	char *file_name = malloc(NAME_MAX + 1);
 	struct dir *dir = dir_parse(copy, file_name);
 
 	struct inode *inode = NULL;
@@ -139,7 +149,9 @@ filesys_remove (const char *name) {
 
 	if (inode_is_file(inode))
 	{
-		bool success = dir != NULL && dir_remove (dir, file_name);
+		
+		success = (dir != NULL) && dir_remove (dir, file_name);
+		
 	}
 	else	// inode is for directory
 	{
@@ -157,9 +169,10 @@ filesys_remove (const char *name) {
 		else dir_close(inode);
 		
 	}
+	free(file_name);
 	dir_close (dir);
-	free(copy);
-
+	palloc_free_page(copy);
+	
 	return success;
 }
 
@@ -187,24 +200,31 @@ do_format (void) {
 bool
 filesys_create_dir (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
-	char *copy = malloc(sizeof(strlen(name)));
+	char *copy = palloc_get_page(PAL_ZERO);
+	if (copy == NULL) return false;
 	strlcpy(copy, name, strlen(name)+1);
 
-	char file_name[NAME_MAX + 1];
+
+
+	char *file_name = malloc(NAME_MAX + 1);
 	struct dir *dir = dir_parse(copy, file_name);
+	if (strlen(file_name) == 0) return false;
+	
 
 	cluster_t inode_cluster = fat_create_chain(0);
 	if (inode_cluster != 0 ) inode_sector = cluster_to_sector(inode_cluster);
 
 	bool success = (dir != NULL
 			&& inode_cluster
-			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 1)
+			&& inode_create (cluster_to_sector(inode_cluster), initial_size, 0)
 			&& dir_add (dir, file_name, inode_sector));
+			
 	if (!success && inode_sector != 0)
 	{
 		fat_remove_chain(inode_cluster, 0);
 		dir_close (dir);
-		free(copy);
+		palloc_free_page(copy);
+		free(file_name);
 		return success;
 	}
 	else
@@ -217,7 +237,10 @@ filesys_create_dir (const char *name, off_t initial_size) {
 
 		dir_close(dir);
 		dir_close(new_dir);
-		free(copy);
+		palloc_free_page(copy);
+		free(file_name);
+
+		
 		return success;
 	}	
 }

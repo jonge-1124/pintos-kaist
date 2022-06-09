@@ -21,6 +21,7 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+#include "userprog/syscall.h"
 
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
@@ -234,14 +235,14 @@ int
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
-
+	
 	/* We first kill the current context */
 	process_cleanup ();
 	
 	/* And then load the binary */
-	
+	lock_acquire(&thread_current()->parent->load_lock);
 	success = load(file_name, &_if);
-	
+	lock_release(&thread_current()->parent->load_lock);
 	
 	palloc_free_page (file_name);
 
@@ -312,7 +313,7 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	// file_close(curr->executable);
+	file_close(curr->executable);
 	
 	struct list_elem *curr_elem = list_begin(&curr->file_table);
 	struct list_elem *last_elem = list_end(&curr->file_table);
@@ -322,7 +323,10 @@ process_exit (void) {
 		struct file_table_entity *e = list_entry(curr_elem, struct file_table_entity, elem);
 		curr_elem = list_next(curr_elem);
 		list_remove(&e->elem);
-		file_close(e->file);
+
+		if (e->is_file)file_close(e->file);
+		else dir_close(e->dir);
+		
 		free(e);
 	}
 	
@@ -336,7 +340,7 @@ process_exit (void) {
 		process_wait(child->tid);
 	}
 
-	// dir_close(curr->current_dir);
+	dir_close(curr->current_dir);
 	
 	process_cleanup ();
 
@@ -462,9 +466,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	memcpy(fn_copy, file_name, strlen(file_name) + 1);
 
 	int argc = 0 ;
-	char *argv[64];
+	char *argv[32];
 	char *token, *save_ptr;
-	char *argv_address[64];
+	char *argv_address[32];
 
 	for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL ; token = strtok_r(NULL, " ", &save_ptr))
 	{
@@ -482,19 +486,21 @@ load (const char *file_name, struct intr_frame *if_) {
 
 
 	/* Open executable file. */
-	
+	lock_acquire(&file_lock);
 	file = filesys_open (file_open);
 	
 
 	if (file != NULL)
 	{
 		file_deny_write(file);
+		lock_release(&file_lock);
 		if (t->executable != NULL) file_close(t->executable);
 		t->executable = file;
 	}
 	
 
 	if (file == NULL) {
+		lock_release(&file_lock);
 		printf ("load: %s: open failed\n", file_open);
 		goto done;
 	}

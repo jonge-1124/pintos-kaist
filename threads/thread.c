@@ -214,6 +214,8 @@ thread_create(const char *name, int priority,
 	
 	list_push_front(&current->children, &t->child);
 
+	t->parent = current;
+
 	if (current->current_dir != NULL)
 	{
 		t->current_dir = dir_reopen(current->current_dir);
@@ -652,7 +654,7 @@ init_thread(struct thread *t, const char *name, int priority, int nice)
 	list_init(&t->file_table);
 
 	//init exec lock
-	lock_init(&t->exec_lock);
+	lock_init(&t->load_lock);
 	
 	//set current directory
 	t->current_dir = NULL;

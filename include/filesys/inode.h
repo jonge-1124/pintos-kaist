@@ -22,4 +22,6 @@ off_t inode_length (const struct inode *);
 
 bool inode_is_file(struct inode *inode);
 void inode_set_use(struct inode *inode, bool in_use);
+
+bool inode_is_removed(struct inode *inode);
 #endif /* filesys/inode.h */

@@ -135,6 +135,8 @@ struct thread
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
 #endif
+	// current directory
+	struct dir *current_dir;
 
 	//project2
 	int exit_status; 
@@ -146,7 +148,7 @@ struct thread
 	struct intr_frame uf;
 	
 	// exit and wait setting
-	
+	struct thread *parent;
 	struct list_elem child;
 	struct list children;
 	
@@ -158,10 +160,7 @@ struct thread
 	struct list file_table;
 
 	// exec lock
-	struct lock exec_lock;
-
-	// current directory
-	struct dir *current_dir;
+	struct lock load_lock;
 
 	/* Owned by thread.c. */
 	struct intr_frame tf; /* Information for switching */

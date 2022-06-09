@@ -231,41 +231,84 @@ struct dir *dir_parse(char *path, char *file_name)
 	struct dir *dir;
 	if (path == NULL || file_name == NULL) return NULL;
 	if (strlen(path) == 0) return NULL;
+	
+	
+	char *token = NULL, *next = NULL, *save = NULL;
 
-	char *token, *next, *save;
-	token = strtok_r (path, "/", &save);
-	next = strtok_r (NULL, "/", &save);
+	if (path[0] == '/')
+	{
+		next = strtok_r(path, "/", &save);
+	}
+	else
+	{
+		token = strtok_r(path, "/", &save);
+		next = strtok_r(NULL, "/", &save);
+	}
+	
 
-	if (token == "")
+	if (token == NULL)	// start with "/"
 	{
 		dir = dir_open_root();
 	}
-	else if (token == ".")
+	else if (strcmp(token,".") == 0) // start with "."
 	{
+		// if current dir removed, then disallow directory system call by returning NULL
+		if (inode_is_removed(thread_current()->current_dir->inode)) return NULL;
+		if (thread_current()->current_dir->inode == NULL ) return NULL;
 		dir = dir_open(thread_current()->current_dir->inode);
 	}
-	else if (token == "..")
-	{
+	else if (strcmp(token, "..") == 0)	// start with ".."
+	{	
+		if (inode_is_removed(thread_current()->current_dir->inode)) return NULL;
+		if (thread_current()->current_dir->inode == NULL ) return NULL;
+
 		struct inode *inode;
 		dir_lookup(thread_current()->current_dir, "..", &inode);
 		dir = dir_open(inode);
 	}
-	else
+	else if (next == NULL) 	// no slash
 	{
+		if (inode_is_removed(thread_current()->current_dir->inode)) return NULL;
+		if (thread_current()->current_dir->inode == NULL ) return NULL;
+
 		if (strlen(path) > NAME_MAX ) return NULL;
 		strlcpy(file_name, path, strlen(path)+1);
 		dir = dir_reopen(thread_current()->current_dir);
 		return dir;
 	}
+	else	// "a/b"
+	{	
+		if (inode_is_removed(thread_current()->current_dir->inode)) return NULL;
+		if (thread_current()->current_dir->inode == NULL ) return NULL;
+
+		struct inode *inode;
+		dir_lookup(thread_current()->current_dir, token, &inode);
+		if (inode_is_file(inode)) return NULL;
+		dir = dir_open(inode);
+	}
+
+	// input path_name = "/"
+	if (token == NULL && next == NULL)
+	{
+		strlcpy(file_name, ".", 2);
+		return dir;
+	}
+
 
 	token = next;
 	next = strtok_r(NULL, "/", &save);
 
 	while (token != NULL && next != NULL)
 	{
+		
 		struct inode *inode;
-		dir_lookup(dir, token, &inode);
-		if (inode_is_file(inode)) return NULL;
+		// path_name not existed
+		if (!dir_lookup(dir, token, &inode)) return NULL;
+		
+		if (inode_is_file(inode)) 
+		{
+			return NULL;
+		}	
 
 		dir_close(dir);
 		dir = dir_open(inode);
