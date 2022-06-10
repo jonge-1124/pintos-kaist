@@ -58,6 +58,7 @@
         "cinttypes": "c",
         "cstdbool": "c",
         "random": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "*.inc": "c"
     }
 }

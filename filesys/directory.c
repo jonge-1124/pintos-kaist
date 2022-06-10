@@ -167,7 +167,9 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	strlcpy (e.name, name, sizeof e.name);
 	e.inode_sector = inode_sector;
 	
-	success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+	off_t n;
+	success = (n= inode_write_at (dir->inode, &e, sizeof e, ofs)) == sizeof e;
+	//printf("%d\n", n);
 	
 done:
 	return success;
@@ -255,7 +257,13 @@ struct dir *dir_parse(char *path, char *file_name)
 		// if current dir removed, then disallow directory system call by returning NULL
 		if (inode_is_removed(thread_current()->current_dir->inode)) return NULL;
 		if (thread_current()->current_dir->inode == NULL ) return NULL;
-		dir = dir_open(thread_current()->current_dir->inode);
+		dir = dir_reopen(thread_current()->current_dir);
+		
+		if (next == NULL) 
+		{
+			strlcpy(file_name, ".", 2);
+			return dir;
+		}	
 	}
 	else if (strcmp(token, "..") == 0)	// start with ".."
 	{	
@@ -265,6 +273,12 @@ struct dir *dir_parse(char *path, char *file_name)
 		struct inode *inode;
 		dir_lookup(thread_current()->current_dir, "..", &inode);
 		dir = dir_open(inode);
+
+		if (next == NULL) 
+		{
+			strlcpy(file_name, ".", 2);
+			return dir;
+		}	
 	}
 	else if (next == NULL) 	// no slash
 	{
@@ -316,6 +330,7 @@ struct dir *dir_parse(char *path, char *file_name)
 		token = next;
 		next = strtok_r(NULL, "/", &save);
 	}
+	
 	if (strlen(token) > NAME_MAX) return NULL;
 	strlcpy(file_name, token, strlen(token)+1);
 	return dir;

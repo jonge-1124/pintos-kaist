@@ -136,41 +136,68 @@ filesys_open (const char *name) {
  * or if an internal memory allocation fails. */
 bool
 filesys_remove (const char *name) {
+	
 	bool success;
 	char *copy = palloc_get_page(PAL_ZERO);
 	if (copy == NULL) return false;
 	strlcpy(copy, name, strlen(name)+1);
+	
 
 	char *file_name = malloc(NAME_MAX + 1);
+	if (file_name == NULL) return false;
 	struct dir *dir = dir_parse(copy, file_name);
+	
 
 	struct inode *inode = NULL;
 	if (dir != NULL) dir_lookup(dir, file_name, &inode);
-
+	
+	
 	if (inode_is_file(inode))
 	{
 		
 		success = (dir != NULL) && dir_remove (dir, file_name);
+		dir_close(dir);
 		
 	}
 	else	// inode is for directory
 	{
+		
 		if (inode_get_inumber(inode) == cluster_to_sector(ROOT_DIR_CLUSTER)) return false;
 		struct dir *dir_inode = dir_open(inode);
-		bool empty;
-		char name[NAME_MAX+1];
+		bool not_empty;
+		char *name = malloc(NAME_MAX + 1);
 
-		dir_readdir(dir_inode, name);	// read "." entry
-		dir_readdir(dir_inode, name);	// read ".." entry
-		if (dir_readdir(dir_inode ,name) == false) empty = true;	// read next entry
-		else empty = false;
 
-		if (empty) success = dir_remove(dir, file_name);
-		else dir_close(inode);
+		not_empty = dir_readdir(dir_inode, name);
+		if (strcmp(name, ".") == 0) 
+		{
+			not_empty = dir_readdir(dir_inode,name);
+			
+		}	
+		if (strcmp(name, "..") == 0) 
+		{
+			not_empty = dir_readdir(dir_inode,name);
+			
+		}	
+
+		
+
+		if (!not_empty) 
+		{
+			
+			success = dir_remove(dir, file_name);
+		}
+		else 
+		{
+			
+			dir_close(dir_inode);
+		}	
+
+		free(name);
+		dir_close(dir);
 		
 	}
 	free(file_name);
-	dir_close (dir);
 	palloc_free_page(copy);
 	
 	return success;

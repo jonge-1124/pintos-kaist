@@ -1,19 +1,18 @@
-Kernel command line: -q -f run copen-missing
+Kernel command line: -q -f put grow-dir-lg.output run grow-dir-lg-persistence
 0 ~ 9fc00 1
 100000 ~ 13e0000 1
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
 Calibrating timer...  157,081,600 loops/s.
-hd0:0: detected 337 sector (168 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:0: detected 345 sector (172 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 8 sector (4 kB) disk, model "QEMU HARDDISK", serial "QM00003"
 Formatting file system...done.
 Boot complete.
-Executing 'copen-missing':
-load: copen-missing: open failed
-Kernel PANIC at ../../userprog/process.c:82 in initd(): Fail to launch initd
-
-Call stack: 0x800421472c 0x8004217e1d 0x8004207fab.
+Putting 'grow-dir-lg.output' into the file system...
+Kernel PANIC at ../../filesys/fsutil.c:109 in fsutil_put(): grow-dir-lg.output: create failed
+Call stack: 0x8004214748 0x800421f76e 0x80042068c0 0x800420617a.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.

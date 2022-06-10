@@ -48,7 +48,7 @@ struct inode {
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
-	if (pos < inode->data.length)
+	if (pos <= inode->data.length)
 	{
 		int n = pos / DISK_SECTOR_SIZE;
 		disk_sector_t start = inode->data.start;
@@ -101,6 +101,8 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 		bool allocate = true;
 		cluster_t index;
 		cluster_t start_disk_cluster;
+
+		// run if sectors > 0
 		for (int i = 0; i<sectors ; i++)
 		{
 			if ( i == 0 ) 
@@ -124,6 +126,17 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 				}
 			}	
 		}
+
+		if (sectors == 0)
+		{
+			index = fat_create_chain(0);
+			start_disk_cluster = index;
+			if (index == 0) 
+			{
+				free(disk_inode);
+				return false;
+			}
+		}
 		
 		if (allocate) {
 			disk_inode->start = cluster_to_sector(start_disk_cluster);
@@ -139,6 +152,12 @@ inode_create (disk_sector_t sector, off_t length, int is_file) {
 					disk_write (filesys_disk, location, zeros); 
 					location = cluster_to_sector(fat_get(sector_to_cluster(location)));
 				}	
+			}
+			else
+			{
+				static char zeros[DISK_SECTOR_SIZE];
+				disk_sector_t location = disk_inode->start;
+				disk_write (filesys_disk, location, zeros); 
 			}
 			success = true; 
 		}
@@ -219,6 +238,7 @@ inode_close (struct inode *inode) {
 			fat_remove_chain(sector_to_cluster(inode->data.start), 0);
 		}
 
+		disk_write(filesys_disk, inode->sector, &inode->data);
 		free (inode); 
 	}
 }
@@ -300,11 +320,59 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	{
 		return 0;
 	}
-		
+
+	disk_sector_t end_file_sec = bytes_to_sectors(inode->data.length);
+	disk_sector_t write_sec = bytes_to_sectors(offset + size);
+
+	// when try to write over the EOF of file
+	if (write_sec > end_file_sec)
+	{
+		disk_sector_t num_alloc_extra = write_sec - end_file_sec;
+		cluster_t last_file;
+		disk_sector_t cur = inode->data.start;
+
+		while(fat_get(sector_to_cluster(cur)) != EOChain)
+		{
+			cur = cluster_to_sector(fat_get(sector_to_cluster(cur)));
+		}
+
+		last_file = sector_to_cluster(cur);
+		cluster_t index = last_file;
+
+		// allocate extra sectors beyond EOF of file
+		for (int i = 0; i < num_alloc_extra ; i++)
+		{
+			index = fat_create_chain(index);
+			if (index == 0) 
+			{
+				fat_remove_chain( fat_get(last_file), last_file);
+				return 0;
+			}
+		}
+
+		// initialize new sectors with zero
+		disk_sector_t location = cluster_to_sector(fat_get(last_file));
+		for (int i = 0; i < num_alloc_extra; i++)
+		{
+			static char zeros[DISK_SECTOR_SIZE];
+			disk_write (filesys_disk, location, zeros);
+			location = cluster_to_sector(fat_get(sector_to_cluster(location)));
+		}
+		inode->data.length = offset+size;
+		disk_write(filesys_disk, inode->sector, &inode->data);
+		//printf("%d\n", inode->data.length);
+	}
+
+	if (inode_length(inode) == offset) 
+	{
+		inode->data.length += size;	
+		disk_write(filesys_disk, inode->sector, &inode->data);
+	}	
 	
 	while (size > 0) {
 		/* Sector to write, starting byte offset within sector. */
 		disk_sector_t sector_idx = byte_to_sector (inode, offset);
+		// printf("%d\n", sector_idx);
 		int sector_ofs = offset % DISK_SECTOR_SIZE;
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */

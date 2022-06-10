@@ -106,6 +106,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_REMOVE :
 		{	
 			lock_acquire(&file_lock);
+			
 			is_valid_access(f->R.rdi);
 			f->R.rax = filesys_remove(f->R.rdi);
 			lock_release(&file_lock);
@@ -125,7 +126,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			strlcpy(copy, f->R.rdi, strlen(f->R.rdi)+1);
 
 			char *file_name = malloc(NAME_MAX + 1);
-			
 			struct dir *dir = dir_parse(copy, file_name);
 			
 			struct inode *inode = NULL;
@@ -161,6 +161,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 							if (is_file) 
 							{
 								e->file = file_o;
+								
 								e->is_file = true;
 							}
 							else 
@@ -215,6 +216,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					}
 				}	
 			}
+			dir_close(dir);
 			free(file_name);
 			palloc_free_page(copy);
 			lock_release(&file_lock);
@@ -227,6 +229,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			struct thread *cur = thread_current();
 			struct file *f_size = NULL;
+			struct dir *dir = NULL;
+			bool is_file;
 
 			struct list_elem *curr = list_begin(&cur->file_table);
 			struct list_elem *last = list_end(&cur->file_table);
@@ -234,13 +238,25 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			while(curr != last)
 			{
 				struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
-				if (e->fd == fd) f_size = e->file;
+				if (e->fd == fd)
+				{
+					if (e->is_file) 
+					{
+						f_size = e->file;
+						is_file = true;
+					}	
+					else 
+					{
+						dir = e->dir;
+						is_file = false;
+					}	
+				}
 				curr = list_next(curr);
 			}
 			
-			if (f_size != NULL)
+			if (!(f_size == NULL && dir == NULL))
 			{
-				f->R.rax = file_length(f_size);
+				if (is_file) f->R.rax = file_length(f_size);
 			}
 			else 
 			{
@@ -439,6 +455,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					struct file_table_entity *e = list_entry(curr, struct file_table_entity, elem);
 					if (e->fd == fd) 
 					{
+					
+
 						if (e->is_file) file_close(e->file);
 						else dir_close(e->dir);
 						
@@ -450,6 +468,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 				}
 			}
 			lock_release(&file_lock);
+			
 			break;
 		}
 		case SYS_CHDIR:
@@ -486,6 +505,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 					}
 				}	
 			}
+			dir_close(dir);
 			free(file_name);
 			free(copy);
 
@@ -599,7 +619,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			char *copy = palloc_get_page(PAL_ZERO);
 			strlcpy(copy, target,strlen(target)+1);
 
-			char file_name[NAME_MAX + 1];
+			char *file_name = malloc(NAME_MAX + 1);
 
 			struct dir *cur_dir = thread_current()->current_dir;
 			struct dir *target_dir = dir_parse(copy, file_name);
@@ -608,13 +628,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			if (dir_lookup(target_dir, file_name, &inode))
 			{
 				dir_add(cur_dir, linkpath, inode_get_inumber(inode));
+				f->R.rax = 0;
 			}
 			else
 			{
 				f->R.rax = -1;
 			}
-			
+			dir_close(target_dir);
 			palloc_free_page(copy);
+			free(file_name);
 			break;
 		}
 	}
